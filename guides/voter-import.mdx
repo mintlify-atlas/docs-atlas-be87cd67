@@ -1,0 +1,85 @@
+---
+title: "Voter Import"
+description: "Bulk-import voter registries into Fire242 from Excel spreadsheets."
+---
+
+## Overview
+
+Admins can upload an Excel file (`.xlsx` or `.xls`) to import voter registration records in bulk. The upload is handled asynchronously — the file is stored and a background job is queued to split and process it in chunks before inserting rows into the `voters` table.
+
+The process uses the `maatwebsite/excel` package for Excel parsing. Background processing jobs (`ProcessExcelSplit` and `MonitorChunksAndInsert`) are available in the codebase to split and insert large files via shell scripts, but the active import endpoint creates the `VoterImportList` record and returns immediately without dispatching the job.
+
+<Warning>
+  Only users with the **Admin** role can perform voter imports. Requests from other roles will be rejected with a 403.
+</Warning>
+
+---
+
+## Import workflow
+
+<Steps>
+  <Step title="Prepare your Excel file">
+    Your spreadsheet must be in `.xlsx` or `.xls` format and must not exceed 2 GB. Each row maps to a record in the `voters` table. Ensure column headers match the expected field names for the importer to map correctly.
+  </Step>
+
+  <Step title="Upload the file">
+    Send the file as `multipart/form-data` to the import endpoint. You can optionally specify `chunk_size` (default: 500, min: 100, max: 10,000) to control how many rows each processing chunk contains.
+
+    ```bash
+    curl -X POST https://your-domain.com/api/admin/voters_list/import \
+      -H "Authorization: Bearer <token>" \
+      -F "file=@/path/to/voters.xlsx" \
+      -F "chunk_size=500"
+    ```
+
+    A successful response confirms the file has been stored and queued:
+
+    ```json
+    {
+      "success": true,
+      "message": "File uploaded and queued for processing",
+      "output_directory": "/storage/uploads/6630f8e2a1c4b",
+      "job_details": {
+        "file_path": "/var/www/storage/app/public/uploads/6630f8e2a1c4b/voters_1714000000.xlsx",
+        "chunk_size": 500
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Check import status">
+    The route `GET /api/admin/voters/import/status/{jobId}` is defined for checking import progress. Query the `voter_import_lists` table directly or implement this endpoint to return the current `status`, `progress`, and `completed_at` fields from the `VoterImportList` record created during upload.
+
+    The `VoterImportList` record is created immediately on upload with `status: "queued"` and includes:
+    - `filename` — cleaned original filename with timestamp
+    - `file_path` — absolute path to the uploaded file
+    - `status` — current state (`queued`, `inserting`, `completed`, `failed`)
+    - `total_rows` / `processed_rows` / `progress` — populated by background jobs when active
+    - `started_at` — time the upload was initiated
+  </Step>
+</Steps>
+
+---
+
+## Import status values
+
+| Status | Description |
+|---|---|
+| `queued` | File has been uploaded; job is waiting in the queue |
+| `inserting` | Chunks have been prepared and Postgres insertion has started |
+| `completed` | All rows have been inserted successfully |
+| `failed` | An error occurred during processing; see `error_message` for details |
+
+---
+
+## Background processing
+
+When the import job runs, two sequential jobs handle the work:
+
+**`ProcessExcelSplit`** — Invokes a shell script (`/var/www/python-scripts/run_split_excel.sh`) that splits the uploaded Excel file into smaller chunk files (e.g., `chunk_1.xlsx`, `chunk_2.xlsx`, …) inside a unique output directory. The job has a 2-hour timeout.
+
+**`MonitorChunksAndInsert`** — Watches the output directory for chunk files to be fully written, then invokes a second shell script (`/var/www/python-scripts/run_insert_to_postgres.sh`) to bulk-insert all chunks into the database. This job has a 24-hour timeout and a single attempt (`tries = 1`).
+
+The monitor polls every 20 seconds and considers chunking complete when the file count is stable across two consecutive checks, or when no new files have appeared in the last 10 minutes. It waits an additional 30 seconds after stability is confirmed before starting insertion.
+
+If the insertion fails at any point, the `voter_import_lists` record is updated to `failed` with an `error_message` describing which line raised the exception.

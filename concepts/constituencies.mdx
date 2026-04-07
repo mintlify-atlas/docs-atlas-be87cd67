@@ -1,0 +1,146 @@
+---
+title: "Constituencies"
+description: "How constituencies, islands, and polling stations are structured in Fire242."
+---
+
+A constituency is the primary geographic and administrative unit in Fire242. Voters are registered to a constituency, field Users are scoped to one constituency, and Managers can oversee one or more. All survey data, voter cards, and reporting aggregate at the constituency level.
+
+## Data model
+
+### `constituencies` table
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | integer | Primary key. |
+| `name` | string | Constituency name (e.g., "Fox Hill"). |
+| `island_id` | integer | Foreign key to `islands.id`. Groups the constituency under its island. |
+| `position` | integer | Sort order for display purposes (default `0`). |
+| `is_active` | boolean | Whether the constituency is active (cast as boolean on the model). |
+
+### `islands` table
+
+Islands group constituencies geographically. The `Island` model has only `id` and `name`, and carries a `hasMany` relationship to `Constituency`:
+
+```php
+// app/Models/Island.php
+public function constituencies()
+{
+    return $this->hasMany(Constituency::class);
+}
+```
+
+The `Constituency` model always eager-loads its island via `$with = ['island']`, so every constituency response includes the island name without an extra query.
+
+```php
+// app/Models/Constituency.php
+protected $with = ['island'];
+
+public function island()
+{
+    return $this->belongsTo(Island::class);
+}
+```
+
+## Voter-to-constituency mapping
+
+Voters are linked to their registered constituency through the `const` column on the `voters` table (an integer matching `constituencies.id`):
+
+```php
+// app/Models/Constituency.php
+public function voters(): HasMany
+{
+    return $this->hasMany(Voter::class, 'const', 'id');
+}
+```
+
+A voter may also have a `living_constituency` (where they currently reside) and a `surveyer_constituency` (the constituency whose field team is responsible for them), both of which are separate foreign keys on the `voters` table. See the [Voter Data Model](/concepts/voters-data-model) page for details.
+
+## Polling stations
+
+Each voter record carries a `polling` integer that identifies their assigned polling station within a constituency. Polling station data is used in election-day reports:
+
+- `GET /api/admin/polling-election-dayGraph` — polling station breakdown graph
+- `GET /api/admin/election-day-report-one` — election day report one
+
+There is no separate `polling_stations` table; polling numbers are embedded directly on voter records.
+
+## User scoping
+
+### Field Users (role: User)
+
+A field User is assigned to exactly one constituency. The `constituency_id` column on the `users` table stores this as a string (to accommodate future flexibility), but in practice it holds a single constituency ID.
+
+When a User calls any voter or survey endpoint under `/api/user/`, the API automatically scopes results to their assigned constituency.
+
+```php
+// app/Models/User.php
+public function constituency()
+{
+    return $this->belongsTo(Constituency::class);
+}
+```
+
+### Managers (role: Manager)
+
+A Manager can be assigned to multiple constituencies. The `constituency_id` column on the `users` table stores a comma-separated list of constituency IDs for Managers (e.g., `"3,7,12"`).
+
+When a Manager logs in, the login response includes an `is_coordinator` flag:
+
+- `is_coordinator: 1` — the Manager oversees more than one constituency.
+- `is_coordinator: 0` — the Manager oversees exactly one constituency.
+
+Managers retrieve their constituency list via `GET /api/manager/constituencies` and `GET /api/manager/constituencies_get`.
+
+<Note>
+Because `constituency_id` is stored as a comma-separated string for Managers, do not use a direct foreign key join to query a Manager's constituencies. Parse the string or use the dedicated manager endpoints.
+</Note>
+
+## Constituency reports
+
+Four constituency aggregate reports are available to both Admins and Managers:
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/admin/getConstituencyReport1` | Report type 1 — voter and survey summary per constituency. |
+| `GET /api/admin/getConstituencyReport2` | Report type 2 — survey completion breakdown. |
+| `GET /api/admin/getConstituencyReport4` | Report type 4 — voter card data summary. |
+| `GET /api/admin/getConstituencyReport5` | Report type 5 — additional aggregation view. |
+| `GET /api/admin/voter-cards-report` | Voter cards report across constituencies. |
+
+The same reports are available under `/api/manager/` scoped to the Manager's assigned constituencies.
+
+A summary of all constituency report metadata is returned by `GET /api/admin/get-constituencies/reports`.
+
+## Manager system settings per constituency
+
+The `ManagerSystemSetting` model allows per-constituency configuration managed by Managers. These settings are scoped by `constituency_id`:
+
+```php
+// app/Models/Constituency.php
+public function systemSettings(): HasMany
+{
+    return $this->hasMany(ManagerSystemSetting::class, 'constituency_id', 'id');
+}
+```
+
+Managers can read and update their constituency settings via `GET /api/manager/system-settings` and `PUT /api/manager/system-settings`.
+
+## Map support
+
+Admins can query which users fall within a geographic bounding box using:
+
+```http
+POST /api/admin/users-in-bounds
+```
+
+This endpoint accepts latitude/longitude bounds and returns the users (and by extension their assigned constituencies) located within that area. It relies on the `latitude` and `longitude` fields cast as floats on the `Voter` model.
+
+## Position ordering
+
+Both constituencies and their parent islands support position-based ordering. Admins can update constituency display order via:
+
+```http
+POST /api/admin/constituencies/update-positions
+```
+
+The `position` column on the `constituencies` table determines the sort order in list responses.

@@ -1,0 +1,214 @@
+---
+title: "Voter Cards"
+description: "Track election-day turnout by recording voter card scans and viewing party-breakdown reports."
+---
+
+## Overview
+
+On election day, when a voter's card is processed at a polling station, a record is created in the `voter_cards_images` table. Each record links the voter's registration number (`reg_no`) to the user who scanned it, an optional card image, and an **exit poll** value indicating the party the voter declared support for.
+
+The `VoterCardImage` model backs this table and exposes a `voter` relationship (keyed on `reg_no` → `voters.voter`) and a computed `image_url` attribute pointing to the stored file.
+
+---
+
+## VoterCardImage fields
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | integer | Primary key |
+| `user_id` | integer | The authenticated user who submitted this record |
+| `reg_no` | string | Voter registration number — links to `voters.voter` |
+| `voter_name` | string \| null | Optional display name captured at scan time |
+| `exit_poll` | string | Party code: `FNM`, `PLP`, `COI`, or `UNK` |
+| `processed` | integer | `1` = processed, `0` = pending |
+| `image` | string \| null | Relative storage path to the uploaded card image |
+| `image_url` | string | Computed full URL to the image (appended attribute) |
+| `record_type` | string \| null | Optional classification tag for the record |
+| `created_at` | timestamp | When the record was created |
+| `updated_at` | timestamp | When the record was last updated |
+
+<Info>
+  The `exit_poll` value `COI` is used internally for the DNA party and is returned when querying the `/voter-cards-dna` endpoint.
+</Info>
+
+---
+
+## Admin endpoints
+
+All admin voter card endpoints are under the `/api/admin/` prefix and require the `Admin` role.
+
+### List all voter cards
+
+```
+GET /api/admin/voter-cards
+```
+
+Returns a paginated list of all `voter_cards_images` records joined to `voters` and `constituencies`. Supports the following query parameters for filtering:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `voter_id` | integer | Filter by registration number |
+| `surname` | string | Partial match on voter surname |
+| `first_name` | string | Partial match on voter first name |
+| `second_name` | string | Partial match on voter second name |
+| `address` | string | Partial match on voter address |
+| `const` | integer | Filter by constituency ID |
+| `polling` | integer | Filter by polling station number |
+| `constituency_name` | string | Filter by constituency name (resolved to ID) |
+| `exists_in_database` | boolean | Filter on whether the voter exists in the main registry |
+| `voter_for` | string | Partial match on `exit_poll` |
+| `per_page` | integer | Results per page (default: 20, max: 100) |
+
+### List by party
+
+```
+GET /api/admin/voter-cards-fnm     # FNM party
+GET /api/admin/voter-cards-plp     # PLP party
+GET /api/admin/voter-cards-dna     # COI/DNA party
+GET /api/admin/voter-cards-unk     # Unknown/undeclared
+```
+
+Each party endpoint accepts the same filter parameters as the main list. Results are cached indefinitely and cache is invalidated on any write operation.
+
+### Aggregate statistics
+
+```
+GET /api/admin/voter-cards-stats
+```
+
+Returns total, pending, and completed counts across all voter card records:
+
+```json
+{
+  "success": true,
+  "message": "Voter cards statistics retrieved successfully",
+  "data": {
+    "total_card_voter": 4821,
+    "pending_card_voter": 12,
+    "completed_card_voter": 4809
+  }
+}
+```
+
+### FNM export (unpaginated)
+
+```
+GET /api/admin/voter-cards-fnm/export
+```
+
+Returns the full un-paginated FNM voter card list. Use this when generating PDFs or bulk exports. The response is also cached to prevent repeated expensive queries.
+
+---
+
+## Adding a voter card result
+
+```
+POST /api/admin/add-voter-card-result
+```
+
+Records a voter card scan. Each `voter_id` can only have one record — use the update endpoint if a record already exists.
+
+**Request body** (`multipart/form-data`):
+
+| Field | Required | Description |
+|---|---|---|
+| `voter_id` | yes | Must exist in `voters.voter` |
+| `party` | yes | Exit poll value: `FNM`, `PLP`, `COI`, or `UNK` |
+| `voter_name` | no | Optional voter display name |
+| `image` | no | Card image file (jpeg, png, jpg, gif, svg — max 2 MB) |
+
+```bash
+curl -X POST https://your-domain.com/api/admin/add-voter-card-result \
+  -H "Authorization: Bearer <token>" \
+  -F "voter_id=A123456" \
+  -F "party=FNM" \
+  -F "voter_name=John Smith" \
+  -F "image=@/path/to/card.jpg"
+```
+
+Returns `409 Conflict` if a record for `voter_id` already exists.
+
+---
+
+## Updating a voter card result
+
+```
+POST /api/admin/update-voter-card-result/{id}
+```
+
+Updates an existing voter card record by its internal ID. All fields are optional — only the fields you include will be changed. If a new image is uploaded, the old image file is deleted from storage.
+
+**Request body** (`multipart/form-data`):
+
+| Field | Required | Description |
+|---|---|---|
+| `voter_id` | no | Updated registration number (must exist in `voters`) |
+| `party` | no | Updated exit poll value |
+| `voter_name` | no | Updated display name |
+| `image` | no | Replacement card image |
+
+---
+
+## Deleting a voter card result
+
+```
+DELETE /api/admin/delete-voter-card-result/{id}
+```
+
+Deletes the voter card record and removes the associated image file from storage. The response cache is flushed on success.
+
+---
+
+## Getting a single voter card result
+
+```
+GET /api/admin/get-voter-card-result/{id}
+```
+
+Returns a single `voter_cards_images` record with `user` and `voter.constituency` relationships loaded. The response includes both `exit_poll` and `circled_exit_poll` (an alias for backward compatibility), and both `processed` and `status` fields.
+
+---
+
+## Election day graph
+
+```
+GET /api/admin/election-day-graph
+```
+
+Returns time-bucketed turnout data covering election day hours (8:00 AM to 5:30 PM EST), broken down by party. Use query parameters to filter by constituency or polling station. This endpoint is useful for rendering real-time turnout charts during election day.
+
+---
+
+## Manager role endpoints
+
+Managers have access to an equivalent set of voter card endpoints under the `/api/manager/` prefix:
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/manager/voter-cards-fnm` | FNM cards (paginated) |
+| `GET /api/manager/voter-cards-fnm/export` | FNM cards (full export) |
+| `GET /api/manager/voter-cards-plp` | PLP cards |
+| `GET /api/manager/voter-cards-dna` | COI/DNA cards |
+| `GET /api/manager/voter-cards-unk` | Unknown cards |
+| `POST /api/manager/add-voter-card-result` | Add a card result |
+| `GET /api/manager/get-voter-card-result/{id}` | Get a single result |
+| `POST /api/manager/update-voter-card-result/{id}` | Update a result |
+| `DELETE /api/manager/delete-voter-card-result/{id}` | Delete a result |
+| `GET /api/manager/list-voter-card-result` | List all results |
+| `GET /api/manager/get-voter-with-id/{id}` | Look up voter name by registration number |
+| `GET /api/manager/election-day-graph` | Election day graph data |
+
+---
+
+## User role endpoints
+
+Field users (role: `User`) can submit and manage their own card scans. The user list endpoint is scoped to the authenticated user's own submissions (`user_id` filter applied automatically).
+
+| Endpoint | Description |
+|---|---|
+| `POST /api/user/add-voter-card-result` | Add a card result |
+| `GET /api/user/get-voter-card-result/{id}` | Get a single result |
+| `POST /api/user/update-voter-card-result/{id}` | Update a result |
+| `DELETE /api/user/delete-voter-card-result/{id}` | Delete a result |
+| `GET /api/user/list-voter-card-result` | List own card results |
+| `GET /api/user/get-voter-with-id/{id}` | Look up voter name (scoped to user's constituencies) |

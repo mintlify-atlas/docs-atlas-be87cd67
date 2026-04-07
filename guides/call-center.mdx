@@ -1,0 +1,106 @@
+---
+title: "Call Center"
+description: "Manage voter outreach queues, log contact attempts, and track follow-up status."
+---
+
+## Overview
+
+The call center module gives field teams a structured queue of voters to contact. Admins and Managers can view the full queue, update contact status, and record the outcome of each interaction. Field users (role: `User`) can access their assigned portion of the list.
+
+Voters in the call center queue are linked to the main `voters` table, giving canvassers access to registration details, constituency, and survey history during outreach.
+
+---
+
+## Workflow
+
+<Steps>
+  <Step title="Load the queue">
+    Fetch the list of voters assigned to the call center. Results are paginated and can be filtered by constituency, polling station, or other voter attributes depending on the caller's role.
+  </Step>
+
+  <Step title="Contact the voter">
+    Canvassers work through the list, contacting each voter by phone or in person. If needed, look up a specific voter by their call center record ID.
+  </Step>
+
+  <Step title="Update call status">
+    After attempting contact, update the call center record with the outcome — whether the voter was reached, the conversation notes, or that a follow-up is required.
+  </Step>
+</Steps>
+
+---
+
+## Admin endpoints
+
+All admin call center endpoints are under the `/api/admin/` prefix and require the `Admin` role.
+
+### List call center voters
+
+```
+GET /api/admin/call-center/list
+```
+
+Returns the paginated call center queue. Supports filter parameters for constituency and polling station matching the voter attributes on file.
+
+### Get a single voter
+
+```
+GET /api/admin/call-center/{id}
+```
+
+Returns the call center record for a specific voter by their internal ID.
+
+### Update call center status
+
+```
+GET /api/admin/call-center/update_status
+```
+
+Updates the overall call center status. Used to mark batches or toggle the active state of the outreach queue.
+
+### Update a call center record
+
+```
+POST /api/admin/update-call-center/{id}
+```
+
+Updates the contact record for a specific voter. Use this to log the outcome of a call — whether the voter was reached, their response, and any follow-up notes.
+
+---
+
+## Manager endpoints
+
+Managers have equivalent access to the call center under the `/api/manager/` prefix:
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/manager/call-center/list` | List call center voters |
+| `GET /api/manager/call-center/{id}` | Get a specific voter's record |
+| `GET /api/manager/call-center/update_status` | Update call center status |
+| `POST /api/manager/update-call-center/{id}` | Update a call center record |
+
+---
+
+## User endpoint
+
+Field users can access the portion of the call center list scoped to their assigned constituencies:
+
+```
+GET /api/user/call-center/list
+```
+
+---
+
+## State lifecycle
+
+A typical call center record moves through these states during an outreach cycle:
+
+| State | Description |
+|---|---|
+| Queued | Voter has been added to the call center but not yet contacted |
+| Contacted | A contact attempt has been made and the record has been updated |
+| Follow-up | Contact was attempted but the voter needs to be reached again |
+| Completed | Outreach is complete for this voter |
+
+<Info>
+  The call center list and voter records share the underlying `voters` table. Changes to a voter's constituency or registration details will be reflected immediately when the call center list is refreshed.
+</Info>

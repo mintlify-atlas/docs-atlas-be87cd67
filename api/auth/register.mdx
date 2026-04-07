@@ -1,0 +1,142 @@
+---
+title: "Register"
+description: "POST /api/auth/register — create a new user account."
+---
+
+## Endpoint
+
+```
+POST /api/auth/register
+```
+
+New accounts are created with the `user` role (`role_id: 2`) and are active immediately.
+
+## Request parameters
+
+<ParamField body="name" type="string" required>
+  Full display name of the user. Maximum 255 characters.
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  Email address. Must be unique across all users. Maximum 255 characters.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Account password. Minimum 6 characters. Must match `password_confirmation`.
+</ParamField>
+
+<ParamField body="password_confirmation" type="string" required>
+  Confirmation of the password. Must be identical to `password`.
+</ParamField>
+
+<ParamField body="phone" type="string">
+  Contact phone number. Maximum 20 characters. Optional.
+</ParamField>
+
+<ParamField body="address" type="string">
+  Mailing or residential address. Optional.
+</ParamField>
+
+### Example request
+
+```bash
+curl --request POST \
+  --url https://your-domain.com/api/auth/register \
+  --header "Content-Type: application/json" \
+  --data '{
+    "name": "Jane Smith",
+    "email": "jane@example.com",
+    "password": "secret123",
+    "password_confirmation": "secret123",
+    "phone": "242-555-0100",
+    "address": "123 Bay Street, Nassau, NP"
+  }'
+```
+
+## Response
+
+A successful registration returns HTTP `200`.
+
+<ResponseField name="status" type="string">
+  Always `"success"` on a successful registration.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable confirmation: `"User created successfully"`.
+</ResponseField>
+
+<ResponseField name="user" type="object">
+  The newly created user record.
+
+  <Expandable title="properties">
+    <ResponseField name="id" type="integer">
+      Auto-incremented primary key.
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Display name provided at registration.
+    </ResponseField>
+    <ResponseField name="email" type="string">
+      Registered email address.
+    </ResponseField>
+    <ResponseField name="phone" type="string">
+      Phone number, or `null` if not provided.
+    </ResponseField>
+    <ResponseField name="address" type="string">
+      Address, or `null` if not provided.
+    </ResponseField>
+    <ResponseField name="role_id" type="integer">
+      Always `2` (user role) for self-registered accounts.
+    </ResponseField>
+    <ResponseField name="is_active" type="boolean">
+      Always `true` for newly registered accounts.
+    </ResponseField>
+    <ResponseField name="created_at" type="string">
+      ISO 8601 timestamp of account creation.
+    </ResponseField>
+    <ResponseField name="updated_at" type="string">
+      ISO 8601 timestamp of the last update.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example response
+
+```json
+{
+  "status": "success",
+  "message": "User created successfully",
+  "user": {
+    "id": 14,
+    "name": "Jane Smith",
+    "email": "jane@example.com",
+    "phone": "242-555-0100",
+    "address": "123 Bay Street, Nassau, NP",
+    "role_id": 2,
+    "is_active": true,
+    "created_at": "2026-04-07T12:00:00.000000Z",
+    "updated_at": "2026-04-07T12:00:00.000000Z"
+  }
+}
+```
+
+## Error responses
+
+**422 — validation errors**
+
+Returned when one or more fields fail validation. Each key in the `errors` object maps to the field name.
+
+```json
+{
+  "name": ["The name field is required."],
+  "email": ["The email has already been taken."],
+  "password": ["The password confirmation does not match."]
+}
+```
+
+Common causes:
+
+| Field | Rule | Message |
+|---|---|---|
+| `email` | Must be unique | `"The email has already been taken."` |
+| `password` | Minimum 6 characters | `"The password must be at least 6 characters."` |
+| `password` | Must match `password_confirmation` | `"The password confirmation does not match."` |

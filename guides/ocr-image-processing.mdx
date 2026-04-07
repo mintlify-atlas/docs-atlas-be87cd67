@@ -1,0 +1,131 @@
+---
+title: "OCR Image Processing"
+description: "Extract voter card data from images using the built-in OCR endpoint."
+---
+
+The OCR endpoint accepts a voter card image, saves it to the server's `public/uploads/` directory, and creates a `VoterCard` record containing the file path. The `thiagoalessio/tesseract_ocr` package is available in the project for offline text extraction workflows, but the HTTP endpoint itself stores the image for later processing rather than returning extracted text inline.
+
+## Endpoint
+
+```
+POST /api/upload-ocr-image
+```
+
+<Note>
+  This endpoint sits **outside** the JWT auth middleware group. No `Authorization` header is required to call it.
+</Note>
+
+## Request
+
+The request must be sent as `multipart/form-data`.
+
+<ParamField body="image" type="file" required>
+  The voter card image to process. Accepted formats: `jpeg`, `jpg`, `png`. Maximum size: **5 MB**.
+</ParamField>
+
+### Example request
+
+```bash
+curl --request POST \
+  --url https://your-domain.com/api/upload-ocr-image \
+  --form "image=@/path/to/voter-card.jpg"
+```
+
+## Response
+
+A successful upload returns HTTP `200` with the following fields:
+
+<ResponseField name="success" type="string">
+  Confirmation message: `"Voter card processed successfully!"`.
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  The newly created `VoterCard` record.
+
+  <Expandable title="properties">
+    <ResponseField name="id" type="integer">
+      Auto-incremented primary key of the voter card record.
+    </ResponseField>
+    <ResponseField name="file_path" type="string">
+      Absolute server path where the uploaded image was saved (e.g. `/var/www/html/public/uploads/1714000000.jpg`).
+    </ResponseField>
+    <ResponseField name="created_at" type="string">
+      ISO 8601 timestamp of when the record was created.
+    </ResponseField>
+    <ResponseField name="updated_at" type="string">
+      ISO 8601 timestamp of the last update.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="processing_time" type="number">
+  Server-side time elapsed in seconds from request start to response.
+</ResponseField>
+
+<Note>
+  The endpoint saves the image and returns the file path. It does not return extracted text in the response. Use the file path to run offline OCR processing via the Tesseract library or the exit poll detection script.
+</Note>
+
+### Example response
+
+```json
+{
+  "success": "Voter card processed successfully!",
+  "data": {
+    "id": 42,
+    "file_path": "/var/www/html/public/uploads/1714000000.jpg",
+    "created_at": "2026-04-07T12:00:00.000000Z",
+    "updated_at": "2026-04-07T12:00:00.000000Z"
+  },
+  "processing_time": 0.0312
+}
+```
+
+## Validation errors
+
+If the uploaded file fails validation the API returns HTTP `422`:
+
+```json
+{
+  "errors": {
+    "image": [
+      "The image field is required.",
+      "The image must be a file of type: jpeg, png, jpg.",
+      "The image must not be greater than 5048 kilobytes."
+    ]
+  }
+}
+```
+
+## Exit poll detection script
+
+The repository ships a companion Python script at `scripts/detect_exit_poll.py` for offline exit poll analysis. It is not called by the HTTP endpoint — run it directly against a saved image file:
+
+```bash
+python scripts/detect_exit_poll.py /path/to/ballot-image.jpg
+```
+
+The script uses OpenCV to:
+
+1. Convert the image to grayscale and apply Gaussian blur.
+2. Apply adaptive thresholding to handle variable lighting conditions.
+3. Scan the bottom region of the image (rows 85 %–95 % of height) for filled mark regions.
+4. Count non-zero pixels across four party columns — `FNM`, `PLP`, `COI`, and `UNK`.
+5. Return the column name with the highest pixel count, or `UNKNOWN` if no clear mark is detected (fewer than 50 white pixels).
+
+Output is printed to stdout:
+
+```
+Pixel counts: {'FNM': 120, 'PLP': 34, 'COI': 18, 'UNK': 22}
+Detected poll: FNM
+FNM
+```
+
+<Note>
+  **Image quality requirements**
+
+  - Minimum resolution: 300 DPI is recommended for reliable OCR text extraction.
+  - The card must be photographed flat, evenly lit, and without obstructions over the printed text.
+  - Blurry, over-exposed, or heavily shadowed images will produce incomplete or empty extracted text.
+  - For exit poll detection, the ballot must be photographed in its entirety so that the bottom 15 % of the frame contains the poll section.
+</Note>

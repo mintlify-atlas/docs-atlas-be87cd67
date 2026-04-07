@@ -1,0 +1,263 @@
+---
+title: "Dashboard & Stats"
+description: "Admin endpoints for dashboard statistics, activity logs, and reporting."
+---
+
+<Note>All endpoints on this page require the **Admin** role. Include a valid JWT token in the `Authorization: Bearer <token>` header on every request.</Note>
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/dashboard/stats` | Overview counts (surveys, voters, parties, etc.) |
+| `GET` | `/api/admin/dashboard-stats/total/{type}` | Paginated stats list filtered by type |
+| `GET` | `/api/admin/question-stats` | Survey answer breakdowns by question |
+| `GET` | `/api/admin/user-activities` | Paginated activity log |
+| `GET` | `/api/admin/election-day-graph` | Time-bucketed voter turnout (8 am–5:30 pm EST) |
+| `POST` | `/api/admin/users-in-bounds` | Retrieve users within a geographic bounding box |
+
+---
+
+## GET /api/admin/dashboard/stats
+
+Returns high-level counts for the admin overview dashboard: total voters, surveys submitted, registered users, active constituencies, and more.
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "total_voters": 12500,
+    "total_surveys": 4320,
+    "total_users": 85,
+    "total_constituencies": 39,
+    "total_parties": 4,
+    "total_unregistered_voters": 210
+  }
+}
+```
+
+---
+
+## GET /api/admin/dashboard-stats/total/{type}
+
+Returns a paginated list of stat records filtered by the given type slug.
+
+### Path parameters
+
+<ParamField path="type" type="string" required>
+  The stat type to retrieve. Examples: `surveys`, `voters`, `users`.
+</ParamField>
+
+### Query parameters
+
+<ParamField query="per_page" type="number" default="15">
+  Number of records per page.
+</ParamField>
+
+---
+
+## GET /api/admin/question-stats
+
+Returns survey answer counts broken down by question. Useful for understanding how voters responded to each survey question across all constituencies.
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "question_id": 1,
+      "question": "Who will you vote for?",
+      "answers": [
+        { "answer": "FNM", "count": 1420 },
+        { "answer": "PLP", "count": 2100 },
+        { "answer": "DNA", "count": 380 }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## GET /api/admin/user-activities
+
+Returns a paginated log of all system activity recorded via Spatie Activitylog. Each entry includes the action description, the user who caused it, and contextual properties such as IP address and user agent.
+
+### Query parameters
+
+<ParamField query="email" type="string">
+  Filter activities by the causer's exact email address.
+</ParamField>
+
+<ParamField query="name" type="string">
+  Filter activities by the causer's name (case-insensitive partial match).
+</ParamField>
+
+<ParamField query="per_page" type="number" default="10">
+  Number of activity records per page.
+</ParamField>
+
+<ParamField query="page" type="number" default="1">
+  Page number to retrieve.
+</ParamField>
+
+### Response
+
+<ResponseField name="success" type="boolean">Indicates request success.</ResponseField>
+<ResponseField name="data" type="object">
+  <Expandable title="properties">
+    <ResponseField name="current_page" type="number">Current page number.</ResponseField>
+    <ResponseField name="total" type="number">Total number of activity records.</ResponseField>
+    <ResponseField name="per_page" type="number">Records per page.</ResponseField>
+    <ResponseField name="last_page" type="number">Last available page.</ResponseField>
+    <ResponseField name="data" type="array">
+      <Expandable title="activity item">
+        <ResponseField name="id" type="number">Activity record ID.</ResponseField>
+        <ResponseField name="description" type="string">Human-readable description of the action performed.</ResponseField>
+        <ResponseField name="causer" type="object">
+          <Expandable title="properties">
+            <ResponseField name="id" type="number">User ID of the actor.</ResponseField>
+            <ResponseField name="name" type="string">Name of the actor.</ResponseField>
+            <ResponseField name="email" type="string">Email of the actor.</ResponseField>
+          </Expandable>
+        </ResponseField>
+        <ResponseField name="properties" type="object">Extra metadata logged with the activity, such as `ip`, `user_agent`, and geo information.</ResponseField>
+        <ResponseField name="created_at" type="string">ISO 8601 timestamp of when the activity occurred.</ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Example response
+
+```json
+{
+  "success": true,
+  "data": {
+    "current_page": 1,
+    "total": 540,
+    "per_page": 10,
+    "last_page": 54,
+    "from": 1,
+    "to": 10,
+    "data": [
+      {
+        "id": 540,
+        "description": "Survey submitted for voter #1023",
+        "causer": {
+          "id": 12,
+          "name": "Jane Smith",
+          "email": "jane@example.com"
+        },
+        "properties": {
+          "ip": "192.168.1.1",
+          "user_agent": "Mozilla/5.0 ..."
+        },
+        "created_at": "2026-04-07T09:15:00Z"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## GET /api/admin/election-day-graph
+
+Returns voter card scan counts grouped into 30-minute time slots from 8:00 am to 5:30 pm EST. Counts are broken out by party (FNM, PLP, DNA, UNK) for each slot. All times are in the America/Nassau timezone.
+
+### Query parameters
+
+<ParamField query="const" type="string">
+  Constituency ID or slug to filter results.
+</ParamField>
+
+<ParamField query="voting_for" type="string">
+  Party slug to filter (e.g., `FNM`, `PLP`, `DNA`).
+</ParamField>
+
+<ParamField query="advance_poll" type="string">
+  Pass `"yes"` to include only advance poll (flagged) voters.
+</ParamField>
+
+<ParamField query="is_voted" type="string">
+  Pass `"yes"` to include only voters whose card has been scanned. Pass `"no"` to exclude them.
+</ParamField>
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "slot": "08:00",
+      "FNM": 42,
+      "PLP": 55,
+      "DNA": 8,
+      "UNK": 3
+    },
+    {
+      "slot": "08:30",
+      "FNM": 61,
+      "PLP": 70,
+      "DNA": 12,
+      "UNK": 5
+    }
+  ]
+}
+```
+
+---
+
+## POST /api/admin/users-in-bounds
+
+Returns field users whose recorded location falls within the provided geographic bounding box. Useful for mapping active canvassers.
+
+### Request body
+
+<ParamField body="north" type="number" required>
+  Northern latitude boundary.
+</ParamField>
+
+<ParamField body="south" type="number" required>
+  Southern latitude boundary.
+</ParamField>
+
+<ParamField body="east" type="number" required>
+  Eastern longitude boundary.
+</ParamField>
+
+<ParamField body="west" type="number" required>
+  Western longitude boundary.
+</ParamField>
+
+### Example request
+
+```bash
+curl -X POST https://your-domain.com/api/admin/users-in-bounds \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"north": 25.1, "south": 24.9, "east": -77.3, "west": -77.5}'
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 12,
+      "name": "Jane Smith",
+      "lat": 25.04,
+      "lng": -77.41,
+      "constituency_id": 5
+    }
+  ]
+}
+```

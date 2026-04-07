@@ -1,0 +1,282 @@
+---
+title: "Surveys API"
+description: "Endpoints for creating, retrieving, updating, and deleting field surveys."
+---
+
+A **survey** is a structured record of an in-person canvassing visit to a registered voter. Surveyors capture demographic information, party affiliation, voting intentions, contact details, and optional photos of the voter and their home. Survey data drives constituency-level analytics and election-day planning.
+
+Each survey is linked to exactly one voter (`voter_id`) and one surveyor (`user_id`). If the voter is found to be deceased, a minimal "died" survey is submitted instead.
+
+<Note>
+  Survey endpoints under `/api/user/` require the `User` role. Survey read and management endpoints under `/api/admin/` require the `Admin` role. All requests must include `Authorization: Bearer <token>`.
+</Note>
+
+---
+
+## User endpoints — `/api/user/`
+
+Surveyors use these endpoints to submit and manage surveys from the field.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/user/surveys/list` | List all surveys submitted by the authenticated surveyor |
+| `POST` | `/api/user/surveys` | Submit a new survey |
+| `GET` | `/api/user/surveys/{id}` | Get a single survey by ID |
+| `PUT` | `/api/user/surveys/{id}` | Update a survey |
+| `DELETE` | `/api/user/surveys/{id}` | Delete a survey |
+| `GET` | `/api/user/voter` | Search for a voter to survey (uses query params) |
+| `GET` | `/api/user/voter/{voterId}` | Get a specific voter's details before surveying |
+| `GET` | `/api/user/voters/suggestions` | Typeahead voter search (min 3 chars, scoped to assigned constituencies) |
+| `GET` | `/api/user/surveyer-search` | Search for other surveyors by name or ID |
+| `GET` | `/api/user/questions-answers` | Fetch the full list of configured questions and their answers |
+| `GET` | `/api/user/call-center/list` | List call-center-mode survey entries |
+
+---
+
+## Admin endpoints — `/api/admin/`
+
+Admins can review and manage all surveys across the system.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/surveys/list` | List all surveys with optional filters |
+| `GET` | `/api/admin/surveys/{id}` | Get a single survey |
+| `POST` | `/api/admin/surveys/{id}` | Update a survey (Admin override) |
+| `GET` | `/api/admin/surveys/challenge/{id}` | Flag a survey as challenged (marks `challenge = true`) |
+| `GET` | `/api/admin/surveyer-search` | Search for surveyors by name or ID |
+| `GET` | `/api/admin/questions-answers` | Fetch questions and answers for the survey form |
+
+---
+
+## Manager endpoints — `/api/manager/`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/manager/surveys/list` | List surveys within the manager's scope |
+| `GET` | `/api/manager/surveys/{id}` | Get a single survey |
+| `POST` | `/api/manager/surveys/{id}` | Update a survey |
+| `POST` | `/api/manager/surveys` | Submit a survey on behalf of a surveyor |
+| `GET` | `/api/manager/surveys/challenge/{id}` | Challenge a survey |
+| `GET` | `/api/manager/surveyer-search` | Search surveyors |
+| `GET` | `/api/manager/questions-answers` | Fetch questions and answers |
+| `DELETE` | `/api/manager/surveys/{id}` | Delete a survey |
+
+---
+
+## Submitting a survey
+
+### `POST /api/user/surveys`
+
+Submits a field survey for a voter. The body is sent as `multipart/form-data` when images are included, or as `application/json` for text-only submissions.
+
+#### Request body parameters
+
+<ParamField body="voter_id" type="integer" required>
+  Database ID of the voter being surveyed. Must exist in the `voters` table.
+</ParamField>
+
+<ParamField body="sex" type="string" required>
+  Voter's self-reported sex as recorded during the visit.
+</ParamField>
+
+<ParamField body="located" type="string" required>
+  Where the voter is currently living. Accepted values: `Main Island`, `Off Island`, `Outside Country`.
+</ParamField>
+
+<ParamField body="voting_for" type="string">
+  Party name the voter intends to vote for (e.g., `"FNM"`, `"PLP"`, `"DNA"`).
+</ParamField>
+
+<ParamField body="voting_decision" type="string">
+  The voter's declared voting decision or likelihood to vote. Free-text or a configured value.
+</ParamField>
+
+<ParamField body="marital_status" type="string">
+  Voter's marital status.
+</ParamField>
+
+<ParamField body="employed" type="string">
+  Whether the voter is currently employed (`"Yes"` / `"No"`).
+</ParamField>
+
+<ParamField body="cell_phone" type="string">
+  Voter's cell phone number.
+</ParamField>
+
+<ParamField body="cell_phone_code" type="string">
+  Country dial code for the cell phone number (e.g., `"+1"`).
+</ParamField>
+
+<ParamField body="home_phone" type="string">
+  Voter's home phone number.
+</ParamField>
+
+<ParamField body="work_phone" type="string">
+  Voter's work phone number.
+</ParamField>
+
+<ParamField body="email" type="string">
+  Voter's email address.
+</ParamField>
+
+<ParamField body="is_died" type="boolean">
+  Set to `true` if the voter is deceased. When `true`, most other fields are optional and a minimal "died" survey is created with an optional `died_date`.
+</ParamField>
+
+<ParamField body="died_date" type="string">
+  Date of death in `YYYY-MM-DD` format. Only used when `is_died` is `true`.
+</ParamField>
+
+<ParamField body="island" type="string">
+  Required when `located` is `"Off Island"`. The island name where the voter currently lives.
+</ParamField>
+
+<ParamField body="country" type="string">
+  Required when `located` is `"Outside Country"`. The country name.
+</ParamField>
+
+<ParamField body="country_location" type="string">
+  Required when `located` is `"Outside Country"`. The city or region within the country.
+</ParamField>
+
+<ParamField body="religion" type="string">
+  Voter's religion.
+</ParamField>
+
+<ParamField body="special_comments" type="string">
+  Any special comments noted during the visit.
+</ParamField>
+
+<ParamField body="other_comments" type="string">
+  Additional free-text comments.
+</ParamField>
+
+<ParamField body="note" type="string">
+  Internal note for campaign staff.
+</ParamField>
+
+<ParamField body="voter_image" type="file">
+  Photo of the voter's ID card or the voter themselves. Stored at `storage/surveys/voter_images/`.
+</ParamField>
+
+<ParamField body="house_image" type="file">
+  Photo of the voter's home. Stored at `storage/surveys/home_images/`.
+</ParamField>
+
+<ParamField body="voters_in_house" type="string">
+  Number or description of other voters living at the same address.
+</ParamField>
+
+<ParamField body="questions" type="array">
+  Array of question/answer pairs from the configured question bank. Each item must include `question_id` and `answer_id`.
+
+  ```json
+  [
+    { "question_id": 1, "answer_id": 3 },
+    { "question_id": 2, "answer_id": 7 }
+  ]
+  ```
+</ParamField>
+
+<ParamField body="unregistered_voters" type="array">
+  Optional array of unregistered voters encountered at this household. Each item is automatically saved as an `UnregisteredVoter` record linked to this survey.
+
+  ```json
+  [
+    {
+      "first_name": "Jordan",
+      "last_name": "Davis",
+      "dob": "2003-06-20",
+      "gender": "Female",
+      "phone": "242-555-0142",
+      "email": "jordan@example.com",
+      "address": "14 East Bay Street",
+      "residentType": "Citizen",
+      "registrationStatus": "Unregistered"
+    }
+  ]
+  ```
+</ParamField>
+
+<ParamField body="survey_id" type="integer">
+  If provided, the API checks whether the submitted data differs from the existing survey. If changes are detected a new survey record is created; if no changes are found the existing survey is returned unchanged. Omit to always create a new record.
+</ParamField>
+
+#### Success response (201)
+
+```json
+{
+  "success": true,
+  "message": "Survey and unregistered voters created successfully",
+  "data": {
+    "survey": {
+      "id": 2841,
+      "voter_id": 1024,
+      "user_id": 7,
+      "sex": "Female",
+      "located": "Main Island",
+      "voting_for": "FNM",
+      "voting_decision": "Strong Support",
+      "marital_status": "Married",
+      "employed": "Yes",
+      "cell_phone": "242-555-0198",
+      "email": "patricia.johnson@example.com",
+      "voter_image": "surveys/voter_images/abc123.jpg",
+      "house_image": "surveys/home_images/def456.jpg",
+      "voter_image_url": "https://api.example.com/storage/surveys/voter_images/abc123.jpg",
+      "home_image_url": "https://api.example.com/storage/surveys/home_images/def456.jpg",
+      "is_died": false,
+      "challange": false,
+      "created_at": "2026-04-07T10:45:00.000000-05:00",
+      "updated_at": "2026-04-07T10:45:00.000000-05:00"
+    },
+    "unregistered_voters": []
+  }
+}
+```
+
+<Note>
+  The response always includes `voter_image_url` and `home_image_url` as computed attributes — these are full absolute URLs to the stored image files, ready to use in an `<img>` tag. The raw `voter_image` and `house_image` fields contain the relative storage path.
+</Note>
+
+---
+
+## Listing surveys with filters
+
+`GET /api/user/surveys/list` supports the following query parameters:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `voting_for` | string | Filter by party name or party ID |
+| `voting_decision` | string | Filter by declared voting decision |
+| `challenge` | string | `"true"` — challenged surveys only; `"false"` — unchallenged only |
+| `exists_in_database` | string | `"true"` / `"false"` — filter by voter registry match |
+| `is_died` | boolean | Filter surveys where voter is marked deceased |
+| `employed` | boolean | Filter by employment status |
+| `located` | string | Filter by location: `Main Island`, `Off Island`, `Outside Country` |
+| `cell_phone` | string | Partial match on cell phone |
+| `email` | string | Partial match on email |
+| `first_name` | string | Full-text search on voter first name |
+| `last_name` | string | Full-text search on voter last name |
+| `voter_id` | string | Filter by voter registration number |
+| `constituency_id` | integer | Filter by constituency ID |
+| `start_date` | string | Include surveys created on or after this date (`YYYY-MM-DD`) |
+| `end_date` | string | Include surveys created on or before this date (`YYYY-MM-DD`) |
+| `per_page` | integer | Results per page (default `20`) |
+
+---
+
+## Challenging a survey
+
+Admins and Managers can mark a survey as challenged when the data appears inaccurate or requires review.
+
+```http
+GET /api/admin/surveys/challenge/2841
+Authorization: Bearer <token>
+```
+
+This sets `challange = true` on the survey record. Challenged surveys can be filtered in list views using `?challenge=true`.
+
+<Warning>
+  Challenging a survey does not delete or modify its data — it only sets a flag. Surveyors whose submissions are regularly challenged may need additional training or supervision.
+</Warning>

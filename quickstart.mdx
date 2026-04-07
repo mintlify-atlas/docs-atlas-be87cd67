@@ -1,80 +1,170 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Quick Start"
+description: "Make your first authenticated API call to Fire242 in under five minutes."
 ---
 
-## Get started in three steps
-
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+This guide walks you through logging in, storing your token, fetching voters, and submitting a survey — the four operations at the core of every Fire242 client integration.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Every protected endpoint requires an `Authorization: Bearer <token>` header. Requests without a valid token receive a `401` response.
 </Note>
+
+<Steps>
+  <Step title="Log in">
+    Send your credentials to the login endpoint to obtain a JWT bearer token.
+
+    ```bash
+    curl --request POST \
+      --url https://your-domain.com/api/auth/login \
+      --header 'Content-Type: application/json' \
+      --data '{
+        "email": "surveyor@example.com",
+        "password": "your-password"
+      }'
+    ```
+
+    A successful response returns the token along with the authenticated user's role, permitted pages, and constituency assignments:
+
+    ```json
+    {
+      "user": {
+        "id": 12,
+        "name": "Jane Smith",
+        "email": "surveyor@example.com",
+        "role_id": 2,
+        "phone": "2421234567",
+        "address": "Nassau, New Providence",
+        "is_active": true,
+        "constituency_id": "3",
+        "image_url": "https://your-domain.com/storage/users/avatar.avif"
+      },
+      "role": "user",
+      "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+      "token_type": "bearer",
+      "pages": [
+        { "id": 1, "slug": "voters-list", "name": "Voters List" },
+        { "id": 2, "slug": "surveys", "name": "Surveys" }
+      ],
+      "constituencies": ["Centreville-Grant's Town"]
+    }
+    ```
+
+    If the credentials are wrong, you receive a `401`. If the account has been deactivated by an admin, you receive a `403`.
+  </Step>
+
+  <Step title="Store your token">
+    Copy the value of the `access_token` field from the response. This is your JWT bearer token.
+
+    Store it securely — in an environment variable, a secure local store, or your application's session management layer. Do not embed it in source code.
+
+    ```bash
+    # Store in a shell variable for use in subsequent requests
+    TOKEN="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+    ```
+
+    Fire242 enforces single-device sessions. If the same account logs in from another device, your token is invalidated and further requests return:
+
+    ```json
+    {
+      "success": false,
+      "message": "You have been logged out due to login on another device"
+    }
+    ```
+
+    When this happens, log in again to obtain a fresh token.
+  </Step>
+
+  <Step title="Fetch voters">
+    Use your token to retrieve the paginated voter list for your assigned constituency.
+
+    ```bash
+    curl --request GET \
+      --url 'https://your-domain.com/api/user/voters-list' \
+      --header "Authorization: Bearer $TOKEN"
+    ```
+
+    The response is paginated. Each page contains voter records from the registry:
+
+    ```json
+    {
+      "current_page": 1,
+      "data": [
+        {
+          "id": 1001,
+          "const": 3,
+          "polling": "001",
+          "voter": "BS-000123",
+          "surname": "JOHNSON",
+          "first_name": "MARCUS",
+          "second_name": "ANTHONY",
+          "dob": "1985-04-12",
+          "address": "14 Blue Hill Road",
+          "house_number": "14",
+          "phone_number": "2421234567",
+          "is_contacted": false,
+          "voter_voting_for": null,
+          "is_national": false
+        }
+      ],
+      "per_page": 50,
+      "total": 4820,
+      "last_page": 97,
+      "next_page_url": "https://your-domain.com/api/user/voters-list?page=2",
+      "prev_page_url": null
+    }
+    ```
+
+    Pass `?page=2` (and so on) to paginate through the full list.
+  </Step>
+
+  <Step title="Submit a survey">
+    Once you have a `voter_id`, you can submit a survey record for that voter. Provide the voter ID and your user ID at minimum. All other fields are optional but recommended for complete canvassing records.
+
+    ```bash
+    curl --request POST \
+      --url 'https://your-domain.com/api/user/surveys' \
+      --header "Authorization: Bearer $TOKEN" \
+      --header 'Content-Type: application/json' \
+      --data '{
+        "voter_id": 1001,
+        "user_id": 12,
+        "sex": "Male",
+        "marital_status": "Married",
+        "employed": "Yes",
+        "employment_type": "Full-time",
+        "voting_for": "FNM",
+        "voting_decision": "Decided",
+        "cell_phone_code": "+1",
+        "cell_phone": "2421234567",
+        "special_comments": "Voter expressed strong support.",
+        "located": "Yes",
+        "island": "New Providence"
+      }'
+    ```
+
+    A successful response returns the created survey record:
+
+    ```json
+    {
+      "id": 5501,
+      "voter_id": 1001,
+      "user_id": 12,
+      "sex": "Male",
+      "marital_status": "Married",
+      "employed": "Yes",
+      "employment_type": "Full-time",
+      "voting_for": "FNM",
+      "voting_decision": "Decided",
+      "cell_phone": "2421234567",
+      "special_comments": "Voter expressed strong support.",
+      "located": "Yes",
+      "island": "New Providence",
+      "challange": false,
+      "created_at": "2026-04-07T14:23:00.000000Z",
+      "updated_at": "2026-04-07T14:23:00.000000Z"
+    }
+    ```
+
+    To retrieve or update an existing survey, use `GET /api/user/surveys/{id}` or `PUT /api/user/surveys/{id}` with the same bearer token.
+  </Step>
+</Steps>

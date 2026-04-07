@@ -1,0 +1,158 @@
+---
+title: "Parties & Constituencies"
+description: "Admin endpoints for managing political parties, constituencies, islands, countries, and locations."
+---
+
+<Note>All `/api/admin/*` endpoints require the **Admin** role. The shared endpoints under `/api/get-all-*` are accessible to any authenticated user.</Note>
+
+---
+
+## Parties
+
+Manage the political parties available for survey and voter card assignment.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/parties` | List all parties |
+| `POST` | `/api/admin/parties` | Create a party |
+| `GET` | `/api/admin/parties/{party}` | Get a single party |
+| `PUT` | `/api/admin/parties/{party}` | Update a party |
+| `GET` | `/api/admin/parties/delete/{party}` | Delete a party |
+| `POST` | `/api/admin/parties/update-positions` | Reorder parties |
+| `GET` | `/api/admin/party/search` | Live search (admin) |
+| `GET` | `/api/get-all-parties` | List all parties (any authenticated role) |
+| `GET` | `/api/livesearch-get-all-parties` | Live search (any authenticated role) |
+
+### POST /api/admin/parties
+
+Creates a new political party.
+
+#### Request body
+
+<ParamField body="name" type="string" required>
+  Full party name (e.g., "Free National Movement").
+</ParamField>
+
+<ParamField body="short_name" type="string" required>
+  Abbreviated name used in stats and reports (e.g., `FNM`).
+</ParamField>
+
+<ParamField body="color" type="string">
+  Hex color code used for charts and UI differentiation (e.g., `#FF0000`).
+</ParamField>
+
+<ParamField body="position" type="number">
+  Display order position. Auto-assigned to the next highest if omitted.
+</ParamField>
+
+### POST /api/admin/parties/update-positions
+
+Reorders parties by updating each party's `position` value in bulk.
+
+#### Request body
+
+<ParamField body="items" type="array" required>
+  Array of position update objects.
+</ParamField>
+
+```json
+{
+  "items": [
+    { "id": 1, "position": 1 },
+    { "id": 2, "position": 2 }
+  ]
+}
+```
+
+<Warning>All IDs must correspond to existing parties. The request will fail with `422` if any ID is not found.</Warning>
+
+---
+
+## Constituencies
+
+Manage the electoral constituencies. Each constituency maps to an island and is assigned to field users and managers.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/constituencies` | List all constituencies |
+| `POST` | `/api/admin/constituencies` | Create a constituency |
+| `GET` | `/api/admin/constituencies/{constituency}` | Get a single constituency |
+| `PUT` | `/api/admin/constituencies/{constituency}` | Update a constituency |
+| `DELETE` | `/api/admin/constituencies/{constituency}` | Delete a constituency |
+| `POST` | `/api/admin/constituencies/update-positions` | Reorder constituencies |
+| `GET` | `/api/admin/constituencies/island/get-islands` | List all islands |
+| `GET` | `/api/get-all-constituencies` | List all constituencies (any authenticated role) |
+| `GET` | `/api/livesearch-all-constituencies` | Live search (any authenticated role) |
+| `GET` | `/api/global-system-settings` | Fetch global system settings (any authenticated role) |
+
+### POST /api/admin/constituencies
+
+Creates a new constituency.
+
+#### Request body
+
+<ParamField body="name" type="string" required>
+  Constituency name (e.g., "Centreville-Baldwins Point").
+</ParamField>
+
+<ParamField body="island_id" type="number">
+  ID of the island this constituency belongs to.
+</ParamField>
+
+<ParamField body="position" type="number">
+  Display order position.
+</ParamField>
+
+### GET /api/admin/constituencies/island/get-islands
+
+Returns the list of islands available for assignment when creating or editing a constituency.
+
+---
+
+## Countries and locations
+
+Countries and locations are reference data used in voter and unregistered voter profiles.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/countries` | List all countries |
+| `POST` | `/api/admin/countries` | Create a country |
+| `GET` | `/api/admin/countries/{country}` | Get a single country |
+| `PUT` | `/api/admin/countries/{country}` | Update a country |
+| `DELETE` | `/api/admin/countries/{country}` | Delete a country |
+| `GET` | `/api/admin/search-countries` | Search countries by name |
+| `GET` | `/api/admin/locations` | List all locations |
+| `POST` | `/api/admin/locations` | Create a location |
+| `GET` | `/api/admin/locations/{location}` | Get a single location |
+| `PUT` | `/api/admin/locations/{location}` | Update a location |
+| `DELETE` | `/api/admin/locations/{location}` | Delete a location |
+| `POST` | `/api/admin/locations/update-positions` | Reorder locations |
+
+### GET /api/admin/search-countries
+
+Searches country records. Powered by `LocationController::searchCountries`.
+
+#### Query parameters
+
+<ParamField query="search" type="string" required>
+  Search term (minimum 2 characters).
+</ParamField>
+
+### POST /api/admin/locations/update-positions
+
+Reorders locations in bulk. Accepts the same `items` array format as other update-positions endpoints.
+
+```json
+{
+  "items": [
+    { "id": 3, "position": 1 },
+    { "id": 7, "position": 2 }
+  ]
+}
+```

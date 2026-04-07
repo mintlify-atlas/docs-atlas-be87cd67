@@ -1,0 +1,263 @@
+---
+title: "Unregistered Voters"
+description: "Endpoints for tracking and managing voters who are not yet on the official registry."
+---
+
+During canvassing, surveyors often encounter people who support the campaign but are not yet in the official voter registry. These individuals are recorded as **unregistered voters** — a separate tracking list used to encourage them to register before election day.
+
+Unregistered voters are linked to the surveyor who identified them, and optionally to the registered voter household where they were found. A notes system lets campaign staff log contact attempts and follow-up actions.
+
+<Note>
+  All endpoints require a valid JWT. Users see only records they created within their assigned constituencies. Admins and Managers have broader read access.
+</Note>
+
+---
+
+## Model fields
+
+The `UnregisteredVoter` model stores the following attributes:
+
+<ResponseField name="id" type="integer">
+  Auto-incrementing primary key.
+</ResponseField>
+
+<ResponseField name="first_name" type="string">
+  First name of the unregistered individual.
+</ResponseField>
+
+<ResponseField name="last_name" type="string">
+  Last name of the unregistered individual.
+</ResponseField>
+
+<ResponseField name="date_of_birth" type="string">
+  Date of birth in `YYYY-MM-DD` format.
+</ResponseField>
+
+<ResponseField name="gender" type="string">
+  Gender as reported during canvassing.
+</ResponseField>
+
+<ResponseField name="phone_number" type="string">
+  Contact phone number.
+</ResponseField>
+
+<ResponseField name="new_email" type="string">
+  Email address.
+</ResponseField>
+
+<ResponseField name="new_address" type="string">
+  Current residential address.
+</ResponseField>
+
+<ResponseField name="party" type="string">
+  Party affiliation indicated by the individual.
+</ResponseField>
+
+<ResponseField name="contacted" type="boolean">
+  Whether this person has been contacted by the campaign.
+</ResponseField>
+
+<ResponseField name="note" type="string">
+  Free-text notes added during creation.
+</ResponseField>
+
+<ResponseField name="diff_address" type="string | null">
+  Alternative address if the individual lives somewhere other than their registered address.
+</ResponseField>
+
+<ResponseField name="living_constituency" type="integer | null">
+  ID of the constituency where the individual currently lives.
+</ResponseField>
+
+<ResponseField name="surveyer_constituency" type="integer | null">
+  ID of the constituency the surveyor belongs to when this record was created.
+</ResponseField>
+
+<ResponseField name="voter_id" type="integer | null">
+  ID of the registered voter household this person was found at, if applicable.
+</ResponseField>
+
+<ResponseField name="survey_id" type="integer | null">
+  ID of the survey where this unregistered voter was recorded.
+</ResponseField>
+
+<ResponseField name="user_id" type="integer">
+  ID of the surveyor who created this record.
+</ResponseField>
+
+<ResponseField name="created_at" type="datetime">
+  Creation timestamp (returned in `America/New_York` timezone).
+</ResponseField>
+
+<ResponseField name="updated_at" type="datetime">
+  Last-updated timestamp (returned in `America/New_York` timezone).
+</ResponseField>
+
+---
+
+## Admin endpoints — `/api/admin/`
+
+Admins have full CRUD access to all unregistered voter records regardless of which surveyor created them.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/unregistered-voters` | List all unregistered voters |
+| `GET` | `/api/admin/unregistered-voters/{id}` | Get a single unregistered voter |
+| `PUT` | `/api/admin/unregistered-voters/{id}` | Update an unregistered voter record |
+| `DELETE` | `/api/admin/unregistered-voters/{id}` | Delete an unregistered voter record |
+| `GET` | `/api/admin/unregistered-voters/admin/get-contacted_voters` | List unregistered voters who have been contacted |
+| `GET` | `/api/admin/unregistered-voters/admin/get-uncontacted_voters` | List unregistered voters not yet contacted |
+| `GET` | `/api/admin/unregistered-voters-diff-address` | List unregistered voters whose living address differs from their registered address |
+
+---
+
+## User endpoints — `/api/user/`
+
+Surveyors can create, view, update, and delete their own unregistered voter records.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/user/unregistered-voters` | Create a new unregistered voter record |
+| `GET` | `/api/user/unregistered-voters` | List unregistered voters visible to this user |
+| `GET` | `/api/user/unregistered-voters/{id}` | Get a single record |
+| `PUT` | `/api/user/unregistered-voters/{id}` | Update a record |
+| `DELETE` | `/api/user/unregistered-voters/{id}` | Delete a record |
+| `GET` | `/api/user/unregistered-voters/{id}/get-contacted_voters` | Contacted voters linked to this unregistered voter |
+| `GET` | `/api/user/unregistered-voters/{id}/get-uncontacted_voters` | Uncontacted voters linked to this unregistered voter |
+| `GET` | `/api/user/unregistered-voters-diff-address` | Records with differing addresses |
+| `POST` | `/api/user/update-diff-address-unregister-voter` | Update the diff address field for an unregistered voter |
+
+---
+
+## Manager endpoints — `/api/manager/`
+
+Managers have read-only access to unregistered voter data within their managed constituencies.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/manager/unregistered-voters` | List unregistered voters |
+| `GET` | `/api/manager/unregistered-voters/{id}` | Get a single record |
+| `PUT` | `/api/manager/unregistered-voters/{id}` | Update a record |
+| `DELETE` | `/api/manager/unregistered-voters/{id}` | Delete a record |
+| `GET` | `/api/manager/unregistered-voters/{id}/get-contacted_voters` | Contacted voters |
+| `GET` | `/api/manager/unregistered-voters/{id}/get-uncontacted_voters` | Uncontacted voters |
+| `GET` | `/api/manager/unregistered-voters-diff-address` | Records with differing addresses |
+
+---
+
+## Notes — tracking contact attempts
+
+Each unregistered voter has an associated notes log that campaign staff use to record contact attempts, registration status updates, and follow-up reminders.
+
+### Admin notes endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/unregistered-voters/notes/list/{unregistered_voter_id}` | List all notes for an unregistered voter |
+| `POST` | `/api/admin/unregistered-voters/{unregistered_voter_id}/contacted` | Create a new contact note |
+| `GET` | `/api/admin/unregistered-voters/notes/{id}` | Get a single note |
+| `PUT` | `/api/admin/unregistered-voters/notes/{id}` | Update a note |
+| `DELETE` | `/api/admin/unregistered-voters/notes/{id}` | Delete a note |
+
+### User notes endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/user/unregistered-voters/notes/list/{unregistered_voter_id}` | List notes for a specific unregistered voter |
+| `POST` | `/api/user/unregistered-voters/{unregistered_voter_id}/contacted` | Log a contact attempt |
+| `GET` | `/api/user/unregistered-voters/notes/{id}` | Get a single note |
+| `PUT` | `/api/user/unregistered-voters/notes/{id}` | Update a note |
+| `DELETE` | `/api/user/unregistered-voters/notes/{id}` | Delete a note |
+
+### Manager notes endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/manager/unregistered-voters/notes/list/{unregistered_voter_id}` | List notes for a specific unregistered voter |
+| `GET` | `/api/manager/unregistered-voters/notes/{id}` | Get a single note |
+| `DELETE` | `/api/manager/unregistered-voters/notes/{id}` | Delete a note |
+
+<Tip>
+  When logging a contact attempt via `POST .../contacted`, the system automatically sets `contacted = true` on the parent unregistered voter record in addition to creating the note.
+</Tip>
+
+---
+
+## Creating an unregistered voter
+
+Unregistered voters are typically created automatically as part of a survey submission (by including them in the `unregistered_voters` array in `POST /api/user/surveys`). They can also be created as standalone records:
+
+```http
+POST /api/user/unregistered-voters
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "first_name": "Marcus",
+  "last_name": "Thompson",
+  "date_of_birth": "2001-09-12",
+  "gender": "Male",
+  "phone_number": "242-555-0173",
+  "new_email": "marcus.t@example.com",
+  "new_address": "23 Blue Hill Road, Nassau",
+  "party": "FNM"
+}
+```
+
+**Success response (201)**
+
+```json
+{
+  "success": true,
+  "message": "Unregistered voter created successfully",
+  "data": {
+    "id": 318,
+    "first_name": "Marcus",
+    "last_name": "Thompson",
+    "date_of_birth": "2001-09-12",
+    "gender": "Male",
+    "phone_number": "242-555-0173",
+    "new_email": "marcus.t@example.com",
+    "new_address": "23 Blue Hill Road, Nassau",
+    "party": "FNM",
+    "contacted": false,
+    "user_id": 7,
+    "created_at": "2026-04-07T10:22:00.000000-05:00",
+    "updated_at": "2026-04-07T10:22:00.000000-05:00"
+  }
+}
+```
+
+---
+
+## Logging a contact attempt
+
+```http
+POST /api/user/unregistered-voters/318/contacted
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "note": "Called on Apr 7. Marcus confirmed he will register at the Town Centre office this week."
+}
+```
+
+**Success response (201)**
+
+```json
+{
+  "success": true,
+  "message": "Contact note saved successfully",
+  "data": {
+    "id": 92,
+    "unregistered_voter_id": 318,
+    "note": "Called on Apr 7. Marcus confirmed he will register at the Town Centre office this week.",
+    "user_id": 7,
+    "created_at": "2026-04-07T10:35:00.000000-05:00"
+  }
+}
+```
+
+<Warning>
+  Deleting an unregistered voter record also deletes all associated notes. This action cannot be undone.
+</Warning>

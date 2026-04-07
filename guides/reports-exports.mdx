@@ -1,0 +1,234 @@
+---
+title: "Reports & Exports"
+description: "Generate constituency reports, voter rolls, birthday lists, and PDF exports."
+---
+
+## Overview
+
+Fire242 provides a suite of reporting endpoints for Admins and Managers. Reports cover dashboard summaries, survey answer breakdowns, constituency-level voter data, election day results, birthday outreach lists, and duplicate voter detection.
+
+<Tip>
+  On voter list endpoints that support it, pass `export=true` as a query parameter to receive the full un-paginated dataset. This is the recommended approach when generating PDFs or bulk exports on the client side.
+</Tip>
+
+---
+
+## Dashboard stats
+
+```
+GET /api/admin/dashboard/stats
+```
+
+Returns top-level aggregate counts for the campaign — total voters, surveys completed, users, and other key metrics. This is the primary data source for the admin dashboard overview.
+
+---
+
+## Question / survey stats
+
+```
+GET /api/admin/question-stats
+```
+
+Returns a breakdown of survey answer distributions across all questions. Useful for understanding voter sentiment at a glance.
+
+Manager equivalent:
+
+```
+GET /api/manager/question-stats
+```
+
+---
+
+## User activity log
+
+```
+GET /api/admin/user-activities
+```
+
+Returns a paginated audit log of user actions recorded by the Spatie activity log package. Each entry includes the action description, the user who performed it (`causer`), and a `properties` object with contextual data.
+
+Supports filtering by `email` or `name` query parameters.
+
+**Response shape:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "current_page": 1,
+    "data": [
+      {
+        "id": 101,
+        "description": "updated voter survey",
+        "causer": {
+          "id": 5,
+          "name": "Jane Doe",
+          "email": "jane@example.com"
+        },
+        "properties": {},
+        "created_at": "2024-04-25T10:30:00.000000Z"
+      }
+    ],
+    "total": 842,
+    "per_page": 10,
+    "last_page": 85,
+    "from": 1,
+    "to": 10
+  }
+}
+```
+
+---
+
+## Constituency reports
+
+### Summary report list
+
+```
+GET /api/admin/get-constituencies/reports
+```
+
+Returns a list of all constituencies with report-level summary data.
+
+Manager equivalent: `GET /api/manager/get-constituencies/reports`
+
+### Detailed constituency reports
+
+Four numbered report endpoints provide different breakdowns of voter and survey data per constituency:
+
+```
+GET /api/admin/getConstituencyReport1
+GET /api/admin/getConstituencyReport2
+GET /api/admin/getConstituencyReport4
+GET /api/admin/getConstituencyReport5
+```
+
+Manager equivalents are available under the `/api/manager/` prefix with the same path names.
+
+### Voter cards report
+
+```
+GET /api/admin/voter-cards-report
+```
+
+Returns a per-constituency summary of voter card scans, useful for comparing turnout across electoral districts.
+
+Manager equivalent: `GET /api/manager/voter-cards-report`
+
+---
+
+## Election day reports
+
+### Summary report
+
+```
+GET /api/admin/election-day-report-one
+```
+
+Returns a structured turnout summary for election day.
+
+Manager equivalent: `GET /api/manager/election-day-report-one`
+
+### Time-series graph
+
+```
+GET /api/admin/election-day-graph
+```
+
+Returns time-bucketed voter card data covering election day from 8:00 AM to 5:30 PM EST, broken down by party. Supports filtering by constituency and polling station. Use this to power real-time turnout visualizations.
+
+Manager equivalent: `GET /api/manager/election-day-graph`
+
+---
+
+## Birthday voters
+
+These endpoints identify voters whose birthdays fall within a configurable window — useful for targeted outreach.
+
+```
+GET /api/admin/birthday-voters
+```
+
+Returns a list of voters with upcoming or current birthdays.
+
+```
+GET /api/admin/birthday-voters-contacted/{id}
+```
+
+Marks a birthday voter as contacted (by their record ID) and returns confirmation.
+
+Manager and User equivalents:
+
+```
+GET /api/manager/birthday-voters
+GET /api/manager/birthday-voters-contacted/{id}
+GET /api/user/birthday-voters
+GET /api/user/birthday-voters-contacted/{id}
+```
+
+---
+
+## Print voters list
+
+```
+GET /api/admin/print_voters
+```
+
+Returns the voter roll in a format suitable for printing or PDF generation. Supports filters for constituency and polling station.
+
+Manager equivalent:
+
+```
+GET /api/manager/print-voters-list
+```
+
+---
+
+## Duplicate voters
+
+```
+GET /api/admin/duplicate-voters
+```
+
+Returns voters with matching `surname` and `second_name` combinations. Results are paginated (50 per page) and ordered by surname and second name.
+
+This is also available as a public (unauthenticated) convenience route at:
+
+```
+GET /api/voters/duplicate
+```
+
+User and Manager equivalents:
+
+```
+GET /api/user/duplicate-voters
+GET /api/manager/duplicate-voters
+```
+
+---
+
+## Newly registered voters
+
+```
+GET /api/admin/voters/newly-registered
+```
+
+Returns voters flagged as newly registered since the last import or registration cycle.
+
+Manager equivalent:
+
+```
+GET /api/manager/voters/newly-registered
+```
+
+---
+
+## FNM voter cards PDF export
+
+```
+GET /api/admin/voter-cards-fnm/export
+```
+
+Returns the complete un-paginated list of FNM voter card records. Unlike the paginated `/voter-cards-fnm` endpoint, this response includes all matching records and is cached to keep response times acceptable for large datasets.
+
+Manager equivalent: `GET /api/manager/voter-cards-fnm/export`

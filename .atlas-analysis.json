@@ -1,23 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "Fire242 Backend",
+  "projectType": "saas",
+  "projectName": "Fire242 Backend",
+  "projectDescription": "A Laravel-based REST API backend for managing electoral campaigns, voter databases, surveys, and multi-role field operations in The Bahamas.",
   "theme": "luma",
-  "colors": {
-    "primary": "#1D4ED8",
-    "light": "#EFF6FF",
-    "dark": "#1E3A8A"
-  },
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/smonderoy/fire242-backend"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/smonderoy/fire242-backend"
-    }
-  },
+  "primaryColor": "#1D4ED8",
+  "lightColor": "#EFF6FF",
+  "darkColor": "#1E3A8A",
   "navigation": {
     "tabs": [
       {
@@ -92,5 +80,36 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "JWT-based authentication with role-based access control (Admin, Manager, User)",
+    "Comprehensive voter registry with search, filtering, and import via Excel/CSV",
+    "Field survey system capturing voter demographics, political preferences, and contact info",
+    "Voter card tracking with election-day turnout graphs and party-breakdown reports",
+    "Call center management for voter outreach and contact logging",
+    "Unregistered voter tracking with notes and contact history",
+    "Constituency and polling station management with geospatial map support",
+    "OCR image processing for voter card data extraction",
+    "Activity logging with GeoIP tracking for audit trails",
+    "PDF and Excel export for all major voter and report datasets"
+  ],
+  "publicApiSurface": [
+    "POST /api/auth/login",
+    "POST /api/auth/register",
+    "POST /api/auth/logout",
+    "GET /api/admin/voters",
+    "POST /api/admin/voters_list/import",
+    "GET /api/admin/surveys/list",
+    "GET /api/admin/dashboard/stats",
+    "GET /api/admin/voter-cards",
+    "GET /api/admin/voter-cards-fnm",
+    "GET /api/admin/election-day-graph",
+    "GET /api/admin/get-constituencies/reports",
+    "GET /api/admin/call-center/list",
+    "GET /api/user/voters-list",
+    "POST /api/user/surveys",
+    "GET /api/manager/voters-list",
+    "POST /api/upload-ocr-image",
+    "GET /api/voters/duplicate"
+  ]
 }

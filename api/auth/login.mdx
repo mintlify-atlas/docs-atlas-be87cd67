@@ -1,0 +1,134 @@
+---
+title: "Login"
+description: "POST /api/auth/login — authenticate and receive a JWT bearer token."
+---
+
+## Endpoint
+
+```
+POST /api/auth/login
+```
+
+## Request parameters
+
+<ParamField body="email" type="string" required>
+  The registered email address of the user.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  The account password.
+</ParamField>
+
+### Example request
+
+```bash
+curl --request POST \
+  --url https://your-domain.com/api/auth/login \
+  --header "Content-Type: application/json" \
+  --data '{
+    "email": "user@example.com",
+    "password": "secret123"
+  }'
+```
+
+## Response fields
+
+<ResponseField name="access_token" type="string">
+  The JWT bearer token to include in subsequent authenticated requests.
+</ResponseField>
+
+<ResponseField name="token_type" type="string">
+  Always `"bearer"`.
+</ResponseField>
+
+<ResponseField name="user" type="object">
+  The authenticated user record, including role and constituency assignments.
+</ResponseField>
+
+<ResponseField name="role" type="string">
+  Lowercase role name of the user, e.g. `"user"`, `"manager"`, or `"admin"`.
+</ResponseField>
+
+<ResponseField name="pages" type="array">
+  List of page objects the user has access to. Populated for `user` and `manager` roles; empty array for other roles.
+</ResponseField>
+
+<ResponseField name="settings" type="object">
+  System settings scoped to the authenticated manager, including constituency associations. `null` for non-manager roles.
+</ResponseField>
+
+<ResponseField name="constituencies" type="array">
+  List of constituency names assigned to the user. Only present when the role is `"user"` and at least one constituency is assigned.
+</ResponseField>
+
+### Example response
+
+```json
+{
+  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "token_type": "bearer",
+  "user": {
+    "id": 7,
+    "name": "Jane Smith",
+    "email": "user@example.com",
+    "role_id": 2,
+    "is_active": true,
+    "constituency_id": "3,5",
+    "created_at": "2026-01-15T09:00:00.000000Z",
+    "updated_at": "2026-04-07T12:00:00.000000Z"
+  },
+  "role": "user",
+  "pages": [
+    { "id": 1, "name": "Dashboard", "slug": "dashboard" }
+  ],
+  "settings": null,
+  "constituencies": ["Elizabeth", "Centreville-Bullock's Harbour"]
+}
+```
+
+## Using the token
+
+Pass the token as a `Bearer` header on all protected endpoints:
+
+```bash
+curl --request GET \
+  --url https://your-domain.com/api/some-protected-resource \
+  --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+```
+
+## Error responses
+
+**401 — invalid credentials**
+
+Returned when the email/password combination does not match any active account.
+
+```json
+{
+  "success": false,
+  "message": "Invalid email or password"
+}
+```
+
+**403 — account blocked**
+
+Returned when credentials are correct but the account has been deactivated by an administrator.
+
+```json
+{
+  "success": false,
+  "message": "Your account has been blocked by admin"
+}
+```
+
+**422 — validation error**
+
+Returned when a required field is missing or malformed.
+
+```json
+{
+  "message": "The email field is required.",
+  "errors": {
+    "email": ["The email field is required."]
+  }
+}
+```

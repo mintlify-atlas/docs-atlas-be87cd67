@@ -1,0 +1,151 @@
+---
+title: "System Settings"
+description: "Admin endpoints for viewing and updating global system settings."
+---
+
+System settings control global operational parameters for the Fire242 platform: session windows, daily survey targets, active working days, and more. There is a single settings record in the database; all updates are applied to that record.
+
+<Note>The database session timezone is always set to `America/Nassau` (EST/EDT) when these endpoints are called.</Note>
+
+---
+
+## Endpoints
+
+| Method | Path | Role required | Description |
+|--------|------|---------------|-------------|
+| `GET` | `/api/admin/system-settings` | Admin | Retrieve current global settings |
+| `PUT` | `/api/admin/system-settings` | Admin | Update global settings |
+| `GET` | `/api/global-system-settings` | Any authenticated | Read-only view of global settings |
+| `GET` | `/api/manager/system-settings` | Manager | Retrieve manager-scoped settings |
+| `PUT` | `/api/manager/system-settings` | Manager | Update manager-scoped settings |
+
+---
+
+## GET /api/admin/system-settings
+
+Retrieves the single system settings record.
+
+### Response
+
+```json
+{
+  "id": 1,
+  "start_time": "08:00",
+  "end_time": "17:30",
+  "active_time": 120,
+  "daily_target": 20,
+  "days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+  "admin_active_time": 480
+}
+```
+
+<ResponseField name="start_time" type="string">
+  Survey window start time in `HH:MM` 24-hour format (America/Nassau timezone).
+</ResponseField>
+
+<ResponseField name="end_time" type="string">
+  Survey window end time in `HH:MM` 24-hour format.
+</ResponseField>
+
+<ResponseField name="active_time" type="number">
+  Number of minutes a user session is considered active before timing out.
+</ResponseField>
+
+<ResponseField name="daily_target" type="number">
+  Target number of surveys a field user should complete per day.
+</ResponseField>
+
+<ResponseField name="days" type="array">
+  Array of active working day names (e.g., `["Monday", "Tuesday"]`). Stored as a comma-separated string internally; returned as an array.
+</ResponseField>
+
+<ResponseField name="admin_active_time" type="number">
+  Session active timeout in minutes for admin users.
+</ResponseField>
+
+---
+
+## PUT /api/admin/system-settings
+
+Updates the global system settings record.
+
+### Request body
+
+<ParamField body="start_time" type="string" required>
+  Survey window start in `HH:MM` format.
+</ParamField>
+
+<ParamField body="end_time" type="string" required>
+  Survey window end in `HH:MM` format.
+</ParamField>
+
+<ParamField body="active_time" type="number" required>
+  User session active time in minutes. Must be at least `1`.
+</ParamField>
+
+<ParamField body="daily_target" type="number" required>
+  Daily survey target per field user. Must be at least `1`.
+</ParamField>
+
+<ParamField body="days" type="array" required>
+  Array of active working day strings.
+</ParamField>
+
+<ParamField body="admin_active_time" type="number" required>
+  Admin session active time in minutes. Must be at least `1`.
+</ParamField>
+
+### Example request
+
+```bash
+curl -X PUT https://your-domain.com/api/admin/system-settings \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "start_time": "08:00",
+    "end_time": "17:30",
+    "active_time": 120,
+    "daily_target": 25,
+    "days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+    "admin_active_time": 480
+  }'
+```
+
+### Example response
+
+```json
+{
+  "success": true,
+  "message": "System settings updated successfully",
+  "data": {
+    "start_time": "08:00",
+    "end_time": "17:30",
+    "active_time": 120,
+    "daily_target": 25,
+    "days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+    "admin_active_time": 480
+  }
+}
+```
+
+---
+
+## GET /api/global-system-settings
+
+A read-only endpoint accessible to **all authenticated users** regardless of role. Returns the same settings record as the admin endpoint. Used by mobile and web clients to check current survey window hours and daily targets.
+
+---
+
+## Manager system settings
+
+Managers have their own `ManagerSystemSetting` record that can override or extend certain global settings within their scope.
+
+### GET /api/manager/system-settings
+
+Returns the manager's system settings record.
+
+### PUT /api/manager/system-settings
+
+Updates the manager's system settings. Accepts the same fields as the admin endpoint.
+
+<Tip>A manager's system settings are also retrievable by an admin via `GET /api/admin/managers/get-settings/{id}`.</Tip>

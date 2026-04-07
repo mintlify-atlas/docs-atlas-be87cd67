@@ -1,0 +1,187 @@
+---
+title: "Surveys"
+description: "How the field survey system works — capturing voter data, party preferences, and contact information."
+---
+
+A survey is the primary data-collection record in Fire242. Each survey links a `voter_id` (the person being surveyed) to a `user_id` (the field surveyor who collected the data). Surveys capture demographics, contact details, party preference, custom question answers, and optional photos.
+
+## Survey fields
+
+### Identity and ownership
+
+| Field | Type | Description |
+|---|---|---|
+| `voter_id` | integer | Foreign key to `voters.id` — the voter this survey belongs to. |
+| `user_id` | integer | Foreign key to `users.id` — the field user who submitted the survey. |
+| `created_by` | integer | The user ID that originally created the record (may differ from `user_id` if an admin created it on behalf of a surveyor). |
+| `updated_by` | integer | The user ID that last modified the record. |
+
+### Demographics
+
+| Field | Type | Description |
+|---|---|---|
+| `sex` | string | Voter's sex. |
+| `marital_status` | string | Marital status. |
+| `employed` | string | Employment status (stored as string, default `false`). |
+| `children` | string | Whether the voter has children (stored as string, default `false`). |
+| `employment_type` | string | Type of employment (e.g., full-time, part-time). |
+| `employment_sector` | string | Industry or sector of employment. |
+| `religion` | string | Religious affiliation. |
+
+### Location
+
+| Field | Type | Description |
+|---|---|---|
+| `located` | string | Current location or address of the voter at time of survey. |
+| `island` | string | Island name, used when the voter is off-island from their registered constituency. |
+| `country` | string | Country, used when the voter is living outside The Bahamas. |
+| `country_location` | string | Specific location within the country (used alongside `country`). |
+
+### Contact information
+
+| Field | Type | Description |
+|---|---|---|
+| `home_phone_code` | string | Country/dialling code for the home phone. |
+| `home_phone` | string | Home phone number (up to 15 characters). |
+| `work_phone_code` | string | Country/dialling code for the work phone. |
+| `work_phone` | string | Work phone number (up to 15 characters). |
+| `cell_phone_code` | string | Country/dialling code for the cell phone. |
+| `cell_phone` | string | Cell phone number (up to 15 characters). |
+| `email` | string | Voter's email address. |
+
+### Political data
+
+| Field | Type | Description |
+|---|---|---|
+| `voting_for` | string | The party the voter intends to vote for at the time of the survey. |
+| `last_voted` | string | The year or election the voter last voted in. |
+| `voted_for_party` | string | The party the voter voted for in the previous election. |
+| `voted_where` | string | Where the voter cast their ballot in the previous election. |
+| `voted_in_house` | string | Whether the voter cast a ballot in a House of Assembly election. |
+| `voting_decision` | string | The surveyor's final assessment of the voter's voting decision. |
+
+### Notes and comments
+
+| Field | Type | Description |
+|---|---|---|
+| `special_comments` | text | Special comments flagged for attention. |
+| `other_comments` | text | General additional comments. |
+| `note` | text | Free-text internal note. |
+
+### Media
+
+Survey records can include two photos stored in Laravel's file storage:
+
+| Field | Appended attribute | Description |
+|---|---|---|
+| `voter_image` | `voter_image_url` | File path of the voter's photo. |
+| `house_image` | `home_image_url` | File path of the house photo. |
+
+The `voter_image_url` and `home_image_url` attributes are appended automatically by the model and return full storage URLs:
+
+```php
+// app/Models/Survey.php
+protected $appends = ['voter_image_url', 'home_image_url'];
+
+public function getVoterImageUrlAttribute()
+{
+    return $this->voter_image ? url('storage/' . $this->voter_image) : null;
+}
+
+public function getHomeImageUrlAttribute()
+{
+    return $this->house_image ? url('storage/' . $this->house_image) : null;
+}
+```
+
+### Household
+
+| Field | Type | Description |
+|---|---|---|
+| `voters_in_house` | integer | Number of voters living at the same household address. |
+
+### Deceased voters
+
+| Field | Type | Description |
+|---|---|---|
+| `is_died` | boolean | Set to `true` when the surveyor marks the voter as deceased. |
+| `died_date` | date | The date of death, if known. |
+
+Deceased voters appear in the `GET /api/admin/died-voters-in-survey` and `GET /api/user/died-voters-in-survey` endpoints.
+
+### Challenge flag
+
+| Field | Type | Description |
+|---|---|---|
+| `challange` | boolean | Marks the survey as disputed or flagged for review. Cast as a boolean. |
+
+<Warning>
+The field is spelled `challange` (not `challenge`) in both the database schema and the model `$fillable` array. Use this exact spelling in API requests.
+</Warning>
+
+## Custom questions (inline)
+
+Each survey can carry up to three inline custom question–answer pairs:
+
+| Fields | Description |
+|---|---|
+| `question_one` / `answer_one` | First custom question text and the surveyor's recorded answer. |
+| `question_two` / `answer_two` | Second custom question and answer. |
+| `question_three` / `answer_three` | Third custom question and answer. |
+
+These are free-form string fields. They complement the structured `SurveyAnswer` system described below.
+
+## Structured answers via `SurveyAnswer`
+
+For admin-configured question banks, the `SurveyAnswer` model provides a normalised link between a survey, a `Question`, and an `Answer`:
+
+```php
+// app/Models/SurveyAnswer.php
+protected $fillable = [
+    'survey_id',
+    'question_id',
+    'answer_id'
+];
+```
+
+Admins manage the question and answer banks through:
+- `GET /api/admin/questions` — list questions
+- `POST /api/admin/questions` — create a question
+- `GET /api/admin/answers` — list answers
+- `POST /api/admin/answers` — create an answer
+
+Field users and Managers retrieve the full questions-and-answers set from their respective endpoints (`GET /api/user/questions-answers`, `GET /api/manager/questions-answers`) to populate the survey form.
+
+## Survey lifecycle
+
+<Steps>
+  <Step title="Field surveyor creates a survey">
+    A User submits `POST /api/user/surveys` with voter and survey data. The `voter_id` and `user_id` are set automatically from the authenticated user's session.
+  </Step>
+  <Step title="Survey is visible to Admin and Manager">
+    Admins access all surveys via `GET /api/admin/surveys/list`. Managers access surveys scoped to their constituencies via `GET /api/manager/surveys/list`.
+  </Step>
+  <Step title="Admin or Manager can update the survey">
+    Admins use `POST /api/admin/surveys/{id}`. Managers use `POST /api/manager/surveys/{id}`. The `updated_by` field is set to the acting user's ID.
+  </Step>
+  <Step title="Challenge flag can be set">
+    Any Admin or Manager can flag a survey for dispute using `GET /api/admin/surveys/challenge/{id}` or `GET /api/manager/surveys/challenge/{id}`. This sets `challange` to `true`.
+  </Step>
+  <Step title="Survey can be deleted">
+    Surveys can be deleted by Admins (`DELETE /api/admin/surveys/{id}`), Managers (`DELETE /api/manager/surveys/{id}`), or the originating User (`DELETE /api/user/surveys/{id}`).
+  </Step>
+</Steps>
+
+## Timestamps and timezone
+
+Survey `created_at` and `updated_at` timestamps are automatically converted to `America/New_York` (Eastern Time) by model accessors:
+
+```php
+// app/Models/Survey.php
+public function getCreatedAtAttribute($value)
+{
+    return Carbon::parse($value)->setTimezone('America/New_York');
+}
+```
+
+All datetime values returned by the API are in Eastern Time.

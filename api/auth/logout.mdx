@@ -1,0 +1,60 @@
+---
+title: "Logout"
+description: "POST /api/auth/logout — invalidate the current JWT token."
+---
+
+## Endpoint
+
+```
+POST /api/auth/logout
+```
+
+Logging out invalidates the current JWT token server-side. Any subsequent requests using the same token will be rejected with an authentication error.
+
+## Request
+
+No request body is required. You must include the current bearer token in the `Authorization` header.
+
+<ParamField header="Authorization" type="string" required>
+  `Bearer <token>` — the JWT issued at login.
+</ParamField>
+
+### Example request
+
+```bash
+curl --request POST \
+  --url https://your-domain.com/api/auth/logout \
+  --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+```
+
+## Response
+
+A successful logout returns HTTP `200`.
+
+<ResponseField name="message" type="string">
+  Always `"Successfully logged out"`.
+</ResponseField>
+
+### Example response
+
+```json
+{
+  "message": "Successfully logged out"
+}
+```
+
+<Note>
+  The token is invalidated immediately upon logout and cannot be reused. Obtain a new token by calling [POST /api/auth/login](/api/auth/login).
+</Note>
+
+## Error responses
+
+**401 — unauthenticated**
+
+Returned when the `Authorization` header is missing or the token is already expired or invalid.
+
+```json
+{
+  "message": "Unauthenticated."
+}
+```

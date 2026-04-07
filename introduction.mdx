@@ -1,0 +1,92 @@
+---
+title: "Introduction"
+description: "Overview of Fire242 Backend — what it does, who uses it, and how it is structured."
+---
+
+## What is Fire242?
+
+Fire242 is a Laravel REST API built for managing electoral campaigns in The Bahamas. The name reflects the country's international dialing code: **+1-242**. The platform gives campaign teams a central backend for everything from voter registry management to field surveys, call center tracking, voter card analysis, and election-day reporting.
+
+All data operations are scoped by constituency — the electoral districts of The Bahamas — so each user only ever sees and acts on the data relevant to their assignment.
+
+## User roles
+
+Fire242 uses a three-tier role model. Every authenticated user belongs to exactly one role, and the API enforces role boundaries on every protected route.
+
+| Role | Description |
+|---|---|
+| **Admin** | Full access to all routes. Manages users, constituencies, parties, questions, answers, system settings, and all reporting. |
+| **Manager** | Oversees one or more constituencies. Manages the field users assigned under them, views aggregate reports, and can update system settings scoped to their assignment. |
+| **User** | Field surveyor. Can access voter lists, submit and manage surveys, record voter card results, and use the call center — all restricted to their assigned constituency. |
+
+Roles are matched by their lowercase slug: `"admin"`, `"manager"`, or `"user"`. The authenticated user's role is returned in every login response so clients can route accordingly.
+
+## Key capabilities
+
+### Voter registry
+
+The voter registry is the core data set. It contains registered voters with fields for constituency assignment (`const`), polling division, voter registration number, name, date of birth, place of birth, address, and contact details. Admins can import bulk voter lists, search by address, view newly registered voters, and identify duplicate or deceased records.
+
+### Field surveys
+
+Field surveyors (User role) submit surveys linked to individual voters. A survey captures demographic information, voting intent (`voting_for`, `voting_decision`), contact details, household data, and up to three configurable questions with answers. Surveys can be challenged and reviewed by admins and managers.
+
+### Voter cards
+
+The voter card module tracks party affiliation for registered voters: FNM, PLP, DNA, or unknown. Admins and managers can list, export, and report on voter card data. Field users can add and update voter card results from the field.
+
+### Call center
+
+A call center module lets teams track voter contact attempts. Admins and managers can list call center records, update contact status, and review individual voter call history.
+
+### Reports and exports
+
+Admins and managers have access to a suite of constituency-level reports:
+
+- Constituency summary reports (report variants 1, 2, 4, and 5)
+- Election day reports and graphs
+- Voter card reports
+- Survey statistics by question
+
+Exports are available in PDF format for certain report types.
+
+### OCR
+
+The API includes an OCR endpoint (`POST /api/upload-ocr-image`) that processes images of voter registration cards, extracting structured data to reduce manual data entry.
+
+## API structure
+
+All endpoints are served under the `/api/` prefix. Routes are grouped by role:
+
+```
+/api/auth/         — Authentication (login, logout, register)
+/api/admin/        — Admin-only endpoints
+/api/user/         — Field user (surveyor) endpoints
+/api/manager/      — Manager endpoints
+/api/              — Shared authenticated endpoints (parties, constituencies, etc.)
+```
+
+Every route except `/api/auth/login` and `/api/auth/register` requires a valid JWT bearer token. The `jwt.auth` middleware validates the token on each request, and role-based middleware (`role:Admin`, `role:User`, `role:Manager`) restricts access by role.
+
+## Authentication overview
+
+Fire242 uses JSON Web Tokens (JWT) via the `php-open-source-saver/jwt-auth` package. You obtain a token by posting credentials to `/api/auth/login`. The token is then sent as an `Authorization: Bearer <token>` header on every subsequent request.
+
+The API enforces single-device sessions: when a new login occurs, the previous token is invalidated. If another device logs in with the same account, subsequent requests from the first device will receive a `401` response indicating the session was terminated.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Make your first authenticated API call in under five minutes.
+  </Card>
+  <Card title="Authentication" icon="lock" href="/authentication">
+    Obtain and use JWT bearer tokens with the Fire242 API.
+  </Card>
+  <Card title="Roles and permissions" icon="shield" href="/concepts/roles-permissions">
+    Understand what each role can access and how route guards work.
+  </Card>
+  <Card title="Voters data model" icon="database" href="/concepts/voters-data-model">
+    Explore the voter registry fields and relationships.
+  </Card>
+</CardGroup>

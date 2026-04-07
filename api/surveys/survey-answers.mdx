@@ -1,0 +1,324 @@
+---
+title: "Survey Questions & Answers"
+description: "Admin-configured question banks and how survey answers are recorded."
+---
+
+Fire242 uses a two-level question/answer system to capture structured canvassing data beyond the standard survey fields.
+
+1. **Admins configure** a question bank: a set of `Question` records, each with an ordered list of `Answer` options.
+2. **Surveyors select** answers from that bank when submitting a survey. Each selection is stored as a `SurveyAnswer` record linking the survey, the question, and the chosen answer.
+
+This approach lets campaign administrators update the question set without requiring a code change or app update.
+
+---
+
+## Questions
+
+Questions are ordered by a `position` integer. Lower positions appear first in the survey form. Admins can reorder them without deleting and recreating records.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/questions` | List all questions with their associated answers |
+| `POST` | `/api/admin/questions` | Create a new question |
+| `GET` | `/api/admin/questions/{question}` | Get a single question and its answers |
+| `PUT` | `/api/admin/questions/{question}` | Update a question's text |
+| `DELETE` | `/api/admin/questions/{question}` | Delete a question |
+| `POST` | `/api/admin/questions/update/positions` | Bulk-update display order |
+
+### Creating a question
+
+```http
+POST /api/admin/questions
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "question": "Does the voter have a transportation plan to reach the polls?"
+}
+```
+
+**Success response (201)**
+
+```json
+{
+  "success": true,
+  "message": "Question created successfully",
+  "question": {
+    "id": 14,
+    "question": "Does the voter have a transportation plan to reach the polls?",
+    "position": 14,
+    "created_at": "2026-04-07T11:00:00.000000Z",
+    "updated_at": "2026-04-07T11:00:00.000000Z"
+  }
+}
+```
+
+New questions are automatically assigned the next available position value (current highest + 1).
+
+### Reordering questions
+
+Send an array of `{id, position}` objects. All IDs must exist in the database; the request is rejected if any are invalid.
+
+```http
+POST /api/admin/questions/update/positions
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "items": [
+    { "id": 1, "position": 3 },
+    { "id": 3, "position": 1 },
+    { "id": 14, "position": 2 }
+  ]
+}
+```
+
+**Success response**
+
+```json
+{
+  "message": "Position of questions updated successfully"
+}
+```
+
+### Listing questions
+
+```http
+GET /api/admin/questions?per_page=50
+Authorization: Bearer <token>
+```
+
+<ParamField query="question" type="string">
+  Case-insensitive partial text search across question text.
+</ParamField>
+
+<ParamField query="per_page" type="integer" default="20">
+  Number of records per page.
+</ParamField>
+
+Results are returned in `position` ascending order. Each question includes its nested `answers` array.
+
+```json
+{
+  "success": true,
+  "data": {
+    "current_page": 1,
+    "data": [
+      {
+        "id": 1,
+        "question": "How likely is this voter to support our candidate?",
+        "position": 1,
+        "answers": [
+          { "id": 1, "question_id": 1, "answer": "Very Likely",   "position": 1 },
+          { "id": 2, "question_id": 1, "answer": "Likely",        "position": 2 },
+          { "id": 3, "question_id": 1, "answer": "Unlikely",      "position": 3 },
+          { "id": 4, "question_id": 1, "answer": "Very Unlikely", "position": 4 }
+        ]
+      }
+    ],
+    "per_page": 20,
+    "total": 14
+  },
+  "search_params": {
+    "question": null
+  }
+}
+```
+
+---
+
+## Answers
+
+Each `Answer` belongs to one `Question` via `question_id`. Answers are also ordered by `position` and can be reordered independently of their parent question.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/answers` | List all answers (optionally filtered by question) |
+| `GET` | `/api/admin/answers/create` | Get all questions (used to populate a "new answer" form) |
+| `POST` | `/api/admin/answers` | Create a new answer |
+| `GET` | `/api/admin/answers/{answer}` | Get a single answer with its parent question |
+| `PUT` | `/api/admin/answers/{answer}` | Update an answer |
+| `DELETE` | `/api/admin/answers/{answer}` | Delete an answer |
+| `POST` | `/api/admin/answers/update/positions` | Bulk-update display order |
+
+### Creating an answer
+
+```http
+POST /api/admin/answers
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "question_id": 14,
+  "answer": "Yes, has a ride"
+}
+```
+
+**Success response (201)**
+
+```json
+{
+  "success": true,
+  "message": "Answer created successfully",
+  "answer": {
+    "id": 58,
+    "question_id": 14,
+    "answer": "Yes, has a ride",
+    "position": 58,
+    "created_at": "2026-04-07T11:05:00.000000Z",
+    "updated_at": "2026-04-07T11:05:00.000000Z"
+  }
+}
+```
+
+### Filtering answers
+
+```http
+GET /api/admin/answers?question_id=14
+Authorization: Bearer <token>
+```
+
+<ParamField query="question_id" type="integer">
+  Return only answers that belong to this question.
+</ParamField>
+
+<ParamField query="answer" type="string">
+  Case-insensitive partial match against answer text.
+</ParamField>
+
+<ParamField query="question" type="string">
+  Case-insensitive partial match against the parent question text.
+</ParamField>
+
+<ParamField query="per_page" type="integer" default="20">
+  Number of records per page.
+</ParamField>
+
+---
+
+## Combined view — questions with answers
+
+Two endpoints return the entire question bank with nested answers in a single call. These are the endpoints surveyors and admin interfaces use to populate survey forms.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/user/questions-answers` | For surveyors — fetch all questions and answers |
+| `GET` | `/api/admin/questions-answers` | For admins — same data |
+| `GET` | `/api/manager/questions-answers` | For managers — same data |
+
+**Response**
+
+```json
+{
+  "success": true,
+  "questions": [
+    {
+      "id": 1,
+      "question": "How likely is this voter to support our candidate?",
+      "position": 1,
+      "answers": [
+        { "id": 1, "question_id": 1, "answer": "Very Likely",   "position": 1 },
+        { "id": 2, "question_id": 1, "answer": "Likely",        "position": 2 },
+        { "id": 3, "question_id": 1, "answer": "Unlikely",      "position": 3 },
+        { "id": 4, "question_id": 1, "answer": "Very Unlikely", "position": 4 }
+      ]
+    },
+    {
+      "id": 2,
+      "question": "Has the voter been contacted before?",
+      "position": 2,
+      "answers": [
+        { "id": 5, "question_id": 2, "answer": "Yes", "position": 1 },
+        { "id": 6, "question_id": 2, "answer": "No",  "position": 2 }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## SurveyAnswer model
+
+When a surveyor submits answers to configured questions, each selection is stored as an individual `SurveyAnswer` row.
+
+<ResponseField name="id" type="integer">
+  Auto-incrementing primary key.
+</ResponseField>
+
+<ResponseField name="survey_id" type="integer">
+  ID of the parent `Survey` record.
+</ResponseField>
+
+<ResponseField name="question_id" type="integer">
+  ID of the `Question` that was answered.
+</ResponseField>
+
+<ResponseField name="answer_id" type="integer">
+  ID of the selected `Answer`.
+</ResponseField>
+
+The model provides a `survey()` belongs-to relationship back to `Survey`, and a `question()` belongs-to relationship to `Question`.
+
+---
+
+## Workflow: fetching questions before submitting a survey
+
+<Steps>
+  <Step title="Load the question bank">
+    Before displaying the survey form, fetch all questions and their answer options:
+
+    ```http
+    GET /api/user/questions-answers
+    Authorization: Bearer <token>
+    ```
+  </Step>
+
+  <Step title="Look up the voter">
+    Retrieve the voter to be surveyed using the voter's registration number or the typeahead search:
+
+    ```http
+    GET /api/user/voters/suggestions?term=VOT-01024&type=voterId
+    Authorization: Bearer <token>
+    ```
+
+    Or get the voter directly:
+
+    ```http
+    GET /api/user/voter/1024
+    Authorization: Bearer <token>
+    ```
+  </Step>
+
+  <Step title="Submit the survey with answers">
+    Include the surveyor's answer selections in the `questions` array when posting the survey:
+
+    ```http
+    POST /api/user/surveys
+    Authorization: Bearer <token>
+    Content-Type: application/json
+
+    {
+      "voter_id": 1024,
+      "sex": "Female",
+      "located": "Main Island",
+      "voting_for": "FNM",
+      "voting_decision": "Strong Support",
+      "questions": [
+        { "question_id": 1, "answer_id": 1 },
+        { "question_id": 2, "answer_id": 5 }
+      ]
+    }
+    ```
+
+    The API stores one `SurveyAnswer` row for each entry in the `questions` array.
+  </Step>
+</Steps>
+
+<Tip>
+  Fetch the question bank once when the app loads and cache it locally. Question/answer data changes infrequently. Refresh the cache when the user navigates to a new constituency or when the app resumes from background.
+</Tip>

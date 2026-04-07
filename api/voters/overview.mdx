@@ -1,0 +1,252 @@
+---
+title: "Voters API"
+description: "Endpoints for searching, filtering, and managing the voter registry."
+---
+
+The voter registry is the central dataset powering Fire242. Every registered voter in The Bahamas has a record that includes their constituency, polling station, name, address, date of birth, and party affiliation data collected during canvassing.
+
+Access to voter records is scoped by role:
+
+- **Admin** — can query voters across all constituencies.
+- **Manager** — same read scope as Admin; scoped to managed constituencies.
+- **User (surveyor)** — can only access voters belonging to their assigned constituencies.
+
+<Note>
+  All voter endpoints require a valid JWT. Pass the token in the `Authorization: Bearer <token>` header on every request.
+</Note>
+
+---
+
+## Endpoints by role
+
+### Admin — `/api/admin/`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/voters` | List / filter voters across all constituencies |
+| `GET` | `/api/admin/voters/address` | Address-based search |
+| `GET` | `/api/admin/voters/newly-registered` | Recently added voters |
+| `GET` | `/api/admin/voters-in-survey` | Voters that have at least one survey |
+| `GET` | `/api/admin/voters-not-in-survey` | Voters with no survey yet |
+| `GET` | `/api/admin/died-voters-in-survey` | Voters marked as deceased in a survey |
+| `GET` | `/api/admin/voters-diff-address` | Voters whose registered address differs from their living address |
+| `GET` | `/api/admin/duplicate-voters` | Voters sharing the same surname and second name |
+| `GET` | `/api/admin/voters-history/{id}` | Survey history for a specific voter |
+| `POST` | `/api/admin/voters_list/import` | Bulk-import voters from a CSV/spreadsheet |
+| `GET` | `/api/admin/voters/import/status/{jobId}` | Poll the status of a queued import job |
+| `GET` | `/api/admin/print_voters` | Printable voter list |
+| `GET` | `/api/admin/election-day-report-one` | Election-day turnout report |
+| `GET` | `/api/admin/election-day-graph` | Election-day graph data |
+
+### User (surveyor) — `/api/user/`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/user/voters-list` | List / filter voters within assigned constituencies |
+| `GET` | `/api/user/voters/suggestions` | Typeahead search for voters (min 3 chars) |
+| `GET` | `/api/user/voters/address` | Address search within assigned constituencies |
+| `GET` | `/api/user/voters-in-survey` | Voters with at least one survey |
+| `GET` | `/api/user/voters-not-in-survey` | Voters not yet surveyed |
+| `GET` | `/api/user/died-voters-in-survey` | Voters marked deceased |
+| `GET` | `/api/user/voters-diff-address` | Voters with a different living address |
+| `GET` | `/api/user/voters-history/{id}` | Survey history for a voter |
+| `GET` | `/api/user/duplicate-voters` | Voters with duplicate name entries |
+| `GET` | `/api/user/voters-list/newly-registered` | Newly registered voters |
+
+### Manager — `/api/manager/`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/manager/voters-list` | Full voter list (manager scope) |
+| `GET` | `/api/manager/voters-in-survey` | Voters with surveys |
+| `GET` | `/api/manager/voters-not-in-survey` | Voters without surveys |
+| `GET` | `/api/manager/voters-diff-address` | Voters with differing addresses |
+| `GET` | `/api/manager/voters-history/{id}` | Voter survey history |
+| `GET` | `/api/manager/duplicate-voters` | Duplicate name entries |
+| `GET` | `/api/manager/voters-list/newly-registered` | Newly registered voters |
+| `GET` | `/api/manager/print-voters-list` | Printable voter list |
+
+---
+
+## Public endpoints (no auth required)
+
+### `GET /api/voters/duplicate`
+
+Returns a paginated list of voters who share the same `surname` and `second_name`, indicating a possible duplicate entry in the official registry.
+
+```json
+{
+  "total_voters": {
+    "current_page": 1,
+    "data": [
+      {
+        "id": 4201,
+        "voter": "VOT-00421",
+        "surname": "SMITH",
+        "first_name": "JAMES",
+        "second_name": "EDWARD",
+        "const": 3,
+        "polling": "12A"
+      }
+    ],
+    "per_page": 50,
+    "total": 120
+  },
+  "total_voters_count": 50
+}
+```
+
+Results are ordered by `surname` then `second_name`. Page size is fixed at 50.
+
+---
+
+## Filtering the voter list
+
+Both `GET /api/admin/voters` and `GET /api/user/voters-list` support an identical set of query parameters for filtering and searching.
+
+### Query parameters
+
+<ParamField query="const" type="integer">
+  Filter voters by constituency ID. Admin users can supply any constituency ID; User-role requests are further constrained to the caller's assigned constituencies.
+</ParamField>
+
+<ParamField query="surname" type="string">
+  Case-insensitive partial match against the voter's surname (`ILIKE '%value%'`).
+</ParamField>
+
+<ParamField query="first_name" type="string">
+  Case-insensitive partial match against the voter's first name.
+</ParamField>
+
+<ParamField query="second_name" type="string">
+  Case-insensitive partial match against the voter's second (middle) name.
+</ParamField>
+
+<ParamField query="voter" type="string">
+  Filter by exact voter registration number.
+</ParamField>
+
+<ParamField query="address" type="string">
+  Case-insensitive partial match against the registered street address.
+</ParamField>
+
+<ParamField query="house_number" type="string">
+  Case-insensitive partial match against the house number field.
+</ParamField>
+
+<ParamField query="polling" type="string">
+  Filter by polling station number (e.g., `"12A"`).
+</ParamField>
+
+<ParamField query="voting_for" type="string">
+  Filter by the party name or party ID the voter is indicated to be supporting. Accepts a numeric ID or a case-insensitive party name string.
+</ParamField>
+
+<ParamField query="advance_poll" type="string">
+  Pass `"yes"` to return only voters who are flagged for advance polling (`flagged = true`).
+</ParamField>
+
+<ParamField query="is_voted" type="string">
+  - `"yes"` — return only voters who have a voter card image on file.
+  - `"no"` — return only voters without a voter card image.
+</ParamField>
+
+<ParamField query="under_age_25" type="string">
+  Pass `"yes"` to return only voters whose date of birth indicates they are under 25 years old at time of request.
+</ParamField>
+
+<ParamField query="sort_by" type="string" default="voter">
+  Column to sort results by. Accepted values: `voter`, `const`, `polling`, `first_name`, `second_name`, `surname`.
+</ParamField>
+
+<ParamField query="sort_order" type="string" default="asc">
+  Sort direction. Accepted values: `asc`, `desc`.
+</ParamField>
+
+<ParamField query="per_page" type="integer" default="20">
+  Number of records per page. Increase as needed; very large values may impact response time.
+</ParamField>
+
+<ParamField query="export" type="string">
+  Pass `"true"` to bypass pagination and return the entire matching dataset as a flat array. Use this for exports only — do not use in interactive UI contexts.
+</ParamField>
+
+---
+
+## Paginated response
+
+Standard paginated responses follow Laravel's pagination envelope:
+
+```json
+{
+  "success": true,
+  "data": {
+    "current_page": 1,
+    "data": [
+      {
+        "id": 1024,
+        "const": 5,
+        "polling": "03B",
+        "voter": "VOT-01024",
+        "surname": "JOHNSON",
+        "first_name": "PATRICIA",
+        "second_name": "ANN",
+        "dob": "1978-04-15",
+        "house_number": "14",
+        "address": "East Street, Nassau",
+        "flagged": false,
+        "is_national": false,
+        "voter_voting_for": "FNM",
+        "living_constituency": 5,
+        "diff_address": null,
+        "email": null,
+        "phone_number": "242-555-0198",
+        "created_at": "2024-01-10T09:30:00.000000Z",
+        "updated_at": "2024-11-02T14:15:00.000000Z"
+      }
+    ],
+    "first_page_url": "https://api.example.com/api/admin/voters?page=1",
+    "from": 1,
+    "last_page": 47,
+    "last_page_url": "https://api.example.com/api/admin/voters?page=47",
+    "next_page_url": "https://api.example.com/api/admin/voters?page=2",
+    "path": "https://api.example.com/api/admin/voters",
+    "per_page": 20,
+    "prev_page_url": null,
+    "to": 20,
+    "total": 928
+  }
+}
+```
+
+When `export=true` the response omits the pagination envelope and returns a top-level `data` array containing all matching records.
+
+---
+
+## Checking import job status
+
+Bulk voter imports are processed asynchronously via Laravel queues. After triggering an import with `POST /api/admin/voters_list/import`, poll the status endpoint until the job completes.
+
+### `GET /api/admin/voters/import/status/{jobId}`
+
+<ParamField path="jobId" type="string" required>
+  The job ID returned in the response from `POST /api/admin/voters_list/import`.
+</ParamField>
+
+**Response example**
+
+```json
+{
+  "success": true,
+  "status": "completed",
+  "job_id": "a3f9b2c1-44e5-4d8a-bb12-0c3d7e8f9012",
+  "imported": 3420,
+  "errors": 0
+}
+```
+
+Possible `status` values: `pending`, `processing`, `completed`, `failed`.
+
+<Tip>
+  Poll no more than once every 2 seconds to avoid overloading the queue worker. Stop polling once `status` is `"completed"` or `"failed"`.
+</Tip>

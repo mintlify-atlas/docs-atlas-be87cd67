@@ -1,0 +1,132 @@
+---
+title: "Voter Data Model"
+description: "Structure of voter records, key fields, relationships, and how voters map to constituencies and surveys."
+---
+
+The `voters` table is the central registry of the Fire242 system. It holds the official electoral roll imported from the national registry, extended with campaign-specific fields that surveyors and managers populate over time.
+
+## Key fields
+
+| Field | Type | Description |
+|---|---|---|
+| `voter` | integer | Voter registration number — the unique electoral ID for this person. Indexed for fast lookup. |
+| `const` | integer | Constituency ID (foreign key to `constituencies.id`). The constituency where this voter is registered. |
+| `polling` | integer | Polling station number within the constituency. |
+| `surname` | string | Voter's surname. Indexed. |
+| `first_name` | string | Voter's first name. Indexed. |
+| `second_name` | string | Voter's second (middle) name. Indexed. |
+| `dob` | date | Date of birth. Indexed. |
+| `address` | text | Full registered address. |
+| `house_number` | string | House number component of the address. |
+| `blkno` | string | Block number component of the address. |
+| `aptno` | string | Apartment number component of the address. |
+| `pobcn` | string | Place of birth — country. |
+| `pobis` | string | Place of birth — island. |
+| `pobse` | string | Place of birth — settlement. |
+| `is_contacted` | boolean | Whether this voter has been contacted (by a field user or call center). |
+| `living_constituency` | integer | The constituency where the voter currently lives, if different from their registered constituency (FK to `constituencies.id`). |
+| `diff_address` | boolean | Flag indicating the voter lives at an address different from their registered address. |
+| `flagged` | boolean | Advance poll flag — marks voters who vote early. |
+| `is_national` | boolean | Indicates the voter appears on the national registry (as opposed to being locally added). |
+| `voter_voting_for` | string | The party this voter is expected to vote for, based on survey data. |
+| `surveyer_constituency` | integer | The constituency whose surveyor currently has responsibility for this voter (FK to `constituencies.id`). |
+| `email` | string | Voter's email address. |
+| `phone_code` | string | International dialling code for the voter's phone. |
+| `phone_number` | string | Voter's phone number. |
+| `note` | text | Free-text notes added by a surveyor or manager. |
+| `user_id` | integer | The User (field surveyor) associated with this voter record. |
+| `newly_registered` | boolean | Marks voters who have recently joined the electoral roll (default `false`). |
+
+## Relationships
+
+The `Voter` model participates in several relationships:
+
+```php
+// app/Models/Voter.php
+
+// Registered constituency
+public function constituency(): BelongsTo
+{
+    return $this->belongsTo(Constituency::class, 'const', 'id');
+}
+
+// Current living constituency (may differ from registered)
+public function living_constituency(): BelongsTo
+{
+    return $this->belongsTo(Constituency::class, 'living_constituency', 'id');
+}
+
+// Constituency whose surveyor is responsible for this voter
+public function surveyer_constituency(): BelongsTo
+{
+    return $this->belongsTo(Constituency::class, 'surveyer_constituency', 'id');
+}
+
+// All surveys submitted for this voter
+public function surveys(): HasMany
+{
+    return $this->hasMany(Survey::class);
+}
+
+// Official voter card record
+public function voterCard(): HasOne
+{
+    return $this->hasOne(VoterCard::class, 'registration_number', 'voter');
+}
+
+// Scanned voter card image
+public function voterCardImage(): HasOne
+{
+    return $this->hasOne(VoterCardImage::class, 'reg_no', 'voter');
+}
+
+// Call center interaction records
+public function callCenter(): HasMany
+{
+    return $this->hasMany(CallCenter::class);
+}
+```
+
+<Note>
+The join between `Voter` and `Constituency` uses `const` → `constituencies.id`, not a conventional `constituency_id` column. Keep this in mind when writing raw queries or custom scopes.
+</Note>
+
+## Registered voters vs. unregistered voters
+
+Fire242 tracks two distinct populations:
+
+**Registered voters** are records in the `voters` table imported from the official Bahamian electoral roll. They have a `voter` registration number and a `const` assignment. Field users and managers work primarily against this table.
+
+**Unregistered voters** are stored in a separate `unregistered_voters` table. These are people a field surveyor has identified as living in a constituency but not yet on the official roll. Field Users can create unregistered voter records via `POST /api/user/unregistered-voters`. Both Admins and Managers can view and manage these records through their respective route prefixes.
+
+## The `is_national` flag
+
+When set to `true`, `is_national` marks the voter as part of the national registry — the authoritative electoral roll imported from the government source. Voters added locally by surveyors or imported separately will have this flag set to `false`.
+
+Admins can view the national registry via `GET /api/admin/national-registery-list` and update individual records via `POST /api/admin/update-national-registery/{id}`.
+
+## Geolocation fields
+
+The `Voter` model casts `latitude` and `longitude` as floats, enabling geographic queries. The map endpoint `POST /api/admin/users-in-bounds` queries users within a bounding box — voter location data supports this spatial feature.
+
+## Pagination
+
+All voter list endpoints return paginated results. The default page size varies by endpoint but is typically 20 records per page. Responses follow Laravel's standard pagination envelope:
+
+```json
+{
+  "current_page": 1,
+  "data": [...],
+  "per_page": 20,
+  "total": 1500,
+  "last_page": 75,
+  "next_page_url": "...",
+  "prev_page_url": null
+}
+```
+
+Pass `?page=2` to advance through pages.
+
+## Voter card data
+
+A voter card (`VoterCard`) is linked to a `Voter` via the voter registration number (`voter` field ↔ `registration_number` on the card). Voter cards capture party affiliation outcome data (FNM, PLP, DNA, UNK) and are a key input to the constituency reports. Scanned card images are stored in the `VoterCardImage` model, accessible via `voterCardImage()`.

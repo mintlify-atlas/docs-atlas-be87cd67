@@ -1,0 +1,164 @@
+---
+title: "Roles & Permissions"
+description: "How Admin, Manager, and User roles control access to Fire242 API endpoints."
+---
+
+Fire242 uses a role-based access control system built on top of JWT authentication. Every authenticated user carries a `role_id` that maps to a row in the `roles` table. The `RoleMiddleware` enforces this at the route level — no request reaches a protected controller action without a valid role match.
+
+## The three roles
+
+<CardGroup cols={3}>
+  <Card title="Admin" icon="shield-check">
+    Full access to all `/api/admin/` endpoints. Manages users, managers, system configuration, voters across all constituencies, and all reporting.
+  </Card>
+  <Card title="Manager" icon="users">
+    Access under `/api/manager/`. Oversees one or more constituencies, manages sub-users (field surveyors), views voter cards and constituency reports.
+  </Card>
+  <Card title="User" icon="user">
+    Field surveyor. Access under `/api/user/`. Scoped to their assigned constituency. Conducts surveys, manages unregistered voters, views voter lists.
+  </Card>
+</CardGroup>
+
+## Role capabilities comparison
+
+| Capability | Admin | Manager | User |
+|---|---|---|---|
+| Manage users (create/update/delete) | Yes | Yes (own sub-users) | No |
+| Manage managers | Yes | No | No |
+| System settings (global) | Yes | No | No |
+| System settings (constituency-level) | Yes | Yes | No |
+| All constituencies | Yes | Assigned only | Assigned only |
+| Import voter list | Yes | No | No |
+| All surveys (read/update) | Yes | Yes | Own surveys only |
+| Challenge a survey | Yes | Yes | No |
+| Constituency reports (1, 2, 4, 5) | Yes | Yes | No |
+| Voter cards (FNM/PLP/DNA/UNK) | Yes | Yes | Yes |
+| Unregistered voters | Yes | Yes | Yes |
+| Call center list | Yes | Yes | Yes |
+| Birthday voters | Yes | Yes | Yes |
+| Dashboard stats | Yes | Yes | Yes |
+| Pages configuration | Yes | No | No |
+| Role permissions management | Yes | No | No |
+| Map / users-in-bounds | Yes | No | No |
+| Questions & Answers config | Yes | No | No |
+
+## How role enforcement works
+
+### The `roles` table
+
+Roles are stored in the `roles` table with the following columns:
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | integer | Primary key |
+| `name` | string | Display name (e.g., `Admin`) |
+| `slug` | string (unique) | Machine-readable identifier used in route middleware (e.g., `admin`) |
+| `description` | text | Optional description |
+
+The `User` model resolves its role through a `belongsTo` relationship:
+
+```php
+// app/Models/User.php
+public function role()
+{
+    return $this->belongsTo(Role::class);
+}
+
+public function hasRole($role)
+{
+    return $this->role->slug === $role;
+}
+```
+
+### JWT middleware and `RoleMiddleware`
+
+All protected routes are wrapped in `jwt.auth` middleware first. Once the JWT is validated and the user is resolved from `Auth::user()`, the `RoleMiddleware` checks that the user's `role->name` matches the required role for that route group:
+
+```php
+// app/Http/Middleware/RoleMiddleware.php
+public function handle($request, Closure $next, string $role)
+{
+    if (!Auth::check()) {
+        return redirect('login');
+    }
+
+    $user = Auth::user();
+
+    if ($user->role->name !== $role) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthorized action'
+        ], 403);
+    }
+
+    return $next($request);
+}
+```
+
+Route groups apply the middleware using the `role:` prefix:
+
+```php
+// routes/api.php
+Route::middleware(['jwt.auth'])->group(function () {
+
+    Route::middleware(['role:Admin'])->prefix('admin')->group(function () {
+        // Admin-only routes
+    });
+
+    Route::middleware(['role:Manager'])->prefix('manager')->group(function () {
+        // Manager-only routes
+    });
+
+    Route::middleware(['role:User'])->prefix('user')->group(function () {
+        // Field user routes
+    });
+});
+```
+
+<Warning>
+The middleware comparison uses `role->name` (the display name string), not the `slug`. Ensure role names in the database match exactly: `Admin`, `Manager`, `User`.
+</Warning>
+
+## Page-level permissions
+
+Beyond route-level role enforcement, Admins can configure which application pages a User or Manager role can access. This is managed through the `pages` and `role_permissions` tables.
+
+### How it works
+
+1. An Admin creates `Page` records (each with a `name`, `url`, and `status`) via `POST /api/admin/pages`.
+2. An Admin links a page to a role via `POST /api/admin/role-permissions`, supplying `role_id` and `page_id`.
+3. When a User or Manager logs in, the login response includes the pages they are permitted to see. Field users can also fetch their current page permissions at runtime via `GET /api/user/fatch-all-user-permissions`, and Managers via `GET /api/manager/fatch-all-manager-permissions`.
+
+### `RolePermission` model
+
+```php
+// app/Models/RolePermission.php
+protected $fillable = [
+    'role_id',
+    'page_id',
+];
+```
+
+A `RolePermission` record is simply a mapping between a `Role` and a `Page`. Deleting the record removes the permission.
+
+<Note>
+There are two separate page systems: `pages` (for User-role pages) and `manager-pages` (for Manager-role pages). Each has its own controller and `update-status` endpoint.
+</Note>
+
+## The `is_super_user` flag
+
+The `users` table includes an `is_super_user` column (fillable on the `User` model). This flag is intended to grant elevated privileges within a role — for example, a super-user Admin may bypass certain constraints that apply to regular Admins. The flag is a boolean and is returned as part of the user object in API responses.
+
+## User–Manager relationship
+
+Field Users are linked to a Manager through the `manager_id` foreign key on the `users` table:
+
+```php
+// app/Models/User.php
+public function manager()
+{
+    return $this->belongsTo(User::class, 'manager_id');
+}
+```
+
+This allows a Manager to see and manage only the Users assigned to them via `GET /api/manager/users`.

@@ -1,0 +1,169 @@
+---
+title: "Manager API"
+description: "Endpoints available to users with the Manager role."
+---
+
+The Manager role sits between Admin and field User. A manager oversees one or more constituencies, supervises field users working in those areas, and has read/write access to surveys, voter cards, and reports scoped to their assigned constituencies.
+
+<Note>All endpoints under `/api/manager/*` require the **Manager** role and a valid JWT bearer token.</Note>
+
+<Tip>A manager with `is_coordinator = true` has visibility across multiple constituencies simultaneously.</Tip>
+
+---
+
+## Voter lists
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/manager/voters-list` | Paginated voter list |
+| `GET` | `/api/manager/voters-list/newly-registered` | Newly registered voters |
+| `GET` | `/api/manager/voters/newly-registered` | Alias for newly registered voters |
+| `GET` | `/api/manager/duplicate-voters` | Voters with duplicate name entries |
+| `GET` | `/api/manager/voters-in-survey` | Voters who have been surveyed |
+| `GET` | `/api/manager/died-voters-in-survey` | Deceased voters included in surveys |
+| `GET` | `/api/manager/voters-not-in-survey` | Voters not yet surveyed |
+| `GET` | `/api/manager/birthday-voters` | Voters with upcoming birthdays |
+| `GET` | `/api/manager/birthday-voters-contacted/{id}` | Birthday voters who have been contacted |
+| `GET` | `/api/manager/voters-diff-address` | Voters registered at a different address |
+| `GET` | `/api/manager/voters-history/{id}` | Survey history for a specific voter |
+| `GET` | `/api/manager/voters/address` | Address-based voter search |
+| `GET` | `/api/manager/voters/unregister/address` | Address search for unregistered voters |
+| `GET` | `/api/manager/national-registery-list` | National registry voter list |
+| `GET` | `/api/manager/national-registery-list/{id}` | Single national registry record |
+| `POST` | `/api/manager/update-national-registery/{id}` | Update a national registry record |
+| `GET` | `/api/manager/register_somewhere_else_living_in_my_constituency` | Voters living in constituency but registered elsewhere |
+| `GET` | `/api/manager/print-voters-list` | Printable voter list |
+
+---
+
+## Surveys
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/manager/surveys/list` | List surveys in scope |
+| `GET` | `/api/manager/surveys/{id}` | Get a single survey |
+| `POST` | `/api/manager/surveys` | Create a survey |
+| `POST` | `/api/manager/surveys/{id}` | Update a survey |
+| `DELETE` | `/api/manager/surveys/{id}` | Delete a survey |
+| `GET` | `/api/manager/surveys/challenge/{id}` | Challenge / flag a survey |
+| `GET` | `/api/manager/questions-answers` | Get all questions and answers for survey form |
+| `GET` | `/api/manager/voter` | Look up a voter for survey creation |
+| `GET` | `/api/manager/voter/{voterId}` | Look up a voter by ID |
+| `GET` | `/api/manager/voters/suggestions` | Autocomplete suggestions for voter lookup |
+| `GET` | `/api/manager/surveyer-search` | Search surveyor (field user) records |
+| `GET` | `/api/manager/constituencies` | List constituencies assigned to this manager |
+| `GET` | `/api/manager/constituencies_get` | Alternative constituency list endpoint |
+
+---
+
+## Voter cards
+
+Voter cards track whether a canvasser has physically collected or viewed a voter's electoral card, broken out by party affiliation.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/manager/voter-cards-fnm` | FNM voter cards |
+| `GET` | `/api/manager/voter-cards-fnm/export` | Export FNM voter cards as PDF |
+| `GET` | `/api/manager/voter-cards-plp` | PLP voter cards |
+| `GET` | `/api/manager/voter-cards-dna` | DNA voter cards |
+| `GET` | `/api/manager/voter-cards-unk` | Unknown-party voter cards |
+| `POST` | `/api/manager/add-voter-card-result` | Record a voter card scan result |
+| `GET` | `/api/manager/get-voter-card-result/{id}` | Get a voter card result |
+| `POST` | `/api/manager/update-voter-card-result/{id}` | Update a voter card result |
+| `DELETE` | `/api/manager/delete-voter-card-result/{id}` | Delete a voter card result |
+| `GET` | `/api/manager/list-voter-card-result` | List all voter card results |
+| `GET` | `/api/manager/get-voter-with-id/{id}` | Get voter details by ID |
+
+---
+
+## Users management
+
+Managers can create and manage field users (surveyors) within their assigned constituencies.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/manager/users` | List field users in scope |
+| `POST` | `/api/manager/users` | Create a field user |
+| `GET` | `/api/manager/users/{user}` | Get a single field user |
+| `PUT` | `/api/manager/users/{user}` | Update a field user |
+| `DELETE` | `/api/manager/users/{user}` | Delete a field user |
+| `GET` | `/api/manager/users/surveys/{id}` | Get surveys for a specific user |
+| `GET` | `/api/manager/get-user-surveys-count/{id}` | Get survey count for a specific user |
+| `GET` | `/api/manager/search-constituencies` | Constituency search for user forms |
+| `GET` | `/api/manager/get_constituencies` | Full list of constituencies in scope |
+
+---
+
+## Unregistered voters
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/manager/unregistered-voters` | List unregistered voters |
+| `GET` | `/api/manager/unregistered-voters/{id}` | Get a single unregistered voter |
+| `PUT` | `/api/manager/unregistered-voters/{id}` | Update an unregistered voter |
+| `DELETE` | `/api/manager/unregistered-voters/{id}` | Delete an unregistered voter |
+| `GET` | `/api/manager/unregistered-voters/{id}/get-contacted_voters` | List contacted records for an unregistered voter |
+| `GET` | `/api/manager/unregistered-voters/{id}/get-uncontacted_voters` | List uncontacted records |
+| `GET` | `/api/manager/unregistered-voters-diff-address` | Unregistered voters at different addresses |
+| `GET` | `/api/manager/unregistered-voters/notes/list/{unregistered_voter_id}` | Notes for an unregistered voter |
+| `GET` | `/api/manager/unregistered-voters/notes/{id}` | Get a single note |
+| `DELETE` | `/api/manager/unregistered-voters/notes/{id}` | Delete a note |
+
+---
+
+## Call center
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/manager/call-center/list` | List call center records |
+| `GET` | `/api/manager/call-center/{id}` | Get a single call center record |
+| `POST` | `/api/manager/update-call-center/{id}` | Update a call center record |
+| `GET` | `/api/manager/call-center/update_status` | Update call center status |
+
+---
+
+## Reports
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/manager/get-constituencies/reports` | Overview constituency report |
+| `GET` | `/api/manager/getConstituencyReport1` | Constituency report 1 |
+| `GET` | `/api/manager/getConstituencyReport2` | Constituency report 2 |
+| `GET` | `/api/manager/getConstituencyReport4` | Constituency report 4 |
+| `GET` | `/api/manager/getConstituencyReport5` | Constituency report 5 |
+| `GET` | `/api/manager/voter-cards-report` | Voter cards summary report |
+| `GET` | `/api/manager/election-day-report-one` | Election day report (format 1) |
+| `GET` | `/api/manager/election-day-graph` | Election day time-bucketed turnout graph |
+| `GET` | `/api/manager/stats` | Manager dashboard stats |
+| `GET` | `/api/manager/stats-list` | Detailed stats list |
+| `GET` | `/api/manager/question-stats` | Survey answer breakdown by question |
+
+---
+
+## Profile
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/manager/get-profile` | Get current manager's profile |
+| `POST` | `/api/manager/update-profile` | Update current manager's profile |
+
+---
+
+## System settings
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/manager/system-settings` | Retrieve manager system settings |
+| `PUT` | `/api/manager/system-settings` | Update manager system settings |
+
+See [System Settings](/api/admin/system-settings) for the full field reference.
+
+---
+
+## Miscellaneous
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/manager/parties` | List parties (for dropdowns) |
+| `GET` | `/api/manager/party/search` | Live search parties |
+| `GET` | `/api/manager/fatch-all-manager-permissions` | Fetch all permission flags for this manager |

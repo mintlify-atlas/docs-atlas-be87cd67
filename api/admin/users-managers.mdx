@@ -1,0 +1,209 @@
+---
+title: "Users & Managers"
+description: "Admin endpoints for managing field users and managers."
+---
+
+<Note>All endpoints on this page require the **Admin** role unless otherwise noted.</Note>
+
+<CardGroup cols={3}>
+  <Card title="Field Users" icon="users">
+    Create and manage canvasser accounts scoped to one or more constituencies.
+  </Card>
+  <Card title="Admin Users" icon="shield">
+    Manage accounts with full admin-level access.
+  </Card>
+  <Card title="Managers" icon="briefcase">
+    Manage manager accounts that oversee field users across constituencies.
+  </Card>
+</CardGroup>
+
+---
+
+## Field users
+
+Field users have `role_id = 2` and are the front-line canvassers who conduct surveys.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/users` | List all field users |
+| `POST` | `/api/admin/users` | Create a field user |
+| `GET` | `/api/admin/users/{user}` | Get a single field user |
+| `PUT` | `/api/admin/users/{user}` | Update a field user |
+| `DELETE` | `/api/admin/users/{user}` | Delete a field user |
+| `GET` | `/api/admin/users/surveys/{id}` | Get surveys submitted by a user |
+| `GET` | `/api/admin/users/get-user-surveys-count/{id}` | Get total survey count for a user |
+| `GET` | `/api/admin/search-constituencies` | Search constituencies (min 2 chars) |
+
+### GET /api/admin/users
+
+Returns a paginated list of field users. Supports filtering by name, address, and constituency.
+
+#### Query parameters
+
+<ParamField query="per_page" type="number" default="15">
+  Number of records per page.
+</ParamField>
+
+<ParamField query="search" type="string">
+  Filter by user name (partial, case-insensitive).
+</ParamField>
+
+<ParamField query="constituency_name" type="string">
+  Filter by constituency name (partial match).
+</ParamField>
+
+<ParamField query="address" type="string">
+  Filter by address (partial, case-insensitive).
+</ParamField>
+
+### POST /api/admin/users
+
+Creates a new field user account.
+
+#### Request body
+
+<ParamField body="name" type="string" required>
+  Full name of the user.
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  Email address. Must be unique.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Account password.
+</ParamField>
+
+<ParamField body="role_id" type="number" required>
+  Role identifier. Use `2` for field users.
+</ParamField>
+
+<ParamField body="phone" type="string">
+  Contact phone number.
+</ParamField>
+
+<ParamField body="address" type="string">
+  Physical address.
+</ParamField>
+
+<ParamField body="constituency_id" type="string">
+  Comma-separated list of constituency IDs the user is assigned to.
+</ParamField>
+
+#### Example response
+
+```json
+{
+  "success": true,
+  "message": "User created successfully",
+  "data": {
+    "id": 42,
+    "name": "John Doe",
+    "email": "john@example.com",
+    "role_id": 2,
+    "constituency_id": "5,6"
+  }
+}
+```
+
+---
+
+## Admin users
+
+Admin users have full system access. These accounts are managed separately from field users.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/admin-users` | List all admin users |
+| `POST` | `/api/admin/admin-users` | Create an admin user |
+| `GET` | `/api/admin/admin-users/{user}` | Get a single admin user |
+| `PUT` | `/api/admin/admin-users/{user}` | Update an admin user |
+| `DELETE` | `/api/admin/admin-users/{user}` | Delete an admin user |
+
+---
+
+## Managers
+
+Managers have `role_id = 3` and oversee field users within their assigned constituencies. A manager with `is_coordinator = true` can manage multiple constituencies simultaneously.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/managers` | List all managers |
+| `POST` | `/api/admin/managers` | Create a manager |
+| `GET` | `/api/admin/managers/{manager}` | Get a single manager |
+| `PUT` | `/api/admin/managers/{manager}` | Update a manager |
+| `DELETE` | `/api/admin/managers/{manager}` | Delete a manager |
+| `GET` | `/api/admin/managers/get-settings/{id}` | Get the manager's system settings |
+
+### GET /api/admin/managers
+
+Returns a paginated list of manager accounts. Supports the same search filters as the users list (`search`, `constituency_name`, `address`).
+
+#### Query parameters
+
+<ParamField query="per_page" type="number" default="15">
+  Number of records per page.
+</ParamField>
+
+<ParamField query="search" type="string">
+  Filter by manager name (partial, case-insensitive).
+</ParamField>
+
+### POST /api/admin/managers
+
+Creates a new manager account.
+
+#### Request body
+
+<ParamField body="name" type="string" required>
+  Full name.
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  Email address. Must be unique.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Account password.
+</ParamField>
+
+<ParamField body="constituency_id" type="string">
+  Comma-separated constituency IDs this manager oversees. When more than one ID is provided, the manager is treated as a coordinator with multi-constituency visibility.
+</ParamField>
+
+### GET /api/admin/managers/get-settings/{id}
+
+Returns the `ManagerSystemSetting` record associated with the given manager ID. These settings can override global system settings for the manager's scope.
+
+---
+
+## Profile
+
+These endpoints allow the currently authenticated admin to view and update their own profile.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/get-profile` | Retrieve the current admin's profile |
+| `POST` | `/api/admin/update-profile` | Update the current admin's profile |
+
+### POST /api/admin/update-profile
+
+#### Request body
+
+<ParamField body="name" type="string">
+  Updated display name.
+</ParamField>
+
+<ParamField body="email" type="string">
+  Updated email address.
+</ParamField>
+
+<ParamField body="password" type="string">
+  New password (optional).
+</ParamField>

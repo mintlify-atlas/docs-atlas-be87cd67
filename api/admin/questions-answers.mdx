@@ -1,0 +1,204 @@
+---
+title: "Questions & Answers"
+description: "Admin endpoints for managing the survey question bank and answer options."
+---
+
+<Note>All endpoints on this page require the **Admin** role.</Note>
+
+---
+
+## Questions
+
+Survey questions form the backbone of the canvassing flow. Each question has an ordered list of answers that field users select during a survey.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/questions` | List all questions (with answers) |
+| `POST` | `/api/admin/questions` | Create a question |
+| `GET` | `/api/admin/questions/{question}` | Get a single question (with answers) |
+| `PUT` | `/api/admin/questions/{question}` | Update a question |
+| `DELETE` | `/api/admin/questions/{question}` | Delete a question |
+| `POST` | `/api/admin/questions/update/positions` | Reorder questions |
+
+### GET /api/admin/questions
+
+Returns a paginated list of questions, each including their associated answers.
+
+#### Query parameters
+
+<ParamField query="per_page" type="number" default="20">
+  Number of questions per page.
+</ParamField>
+
+<ParamField query="question" type="string">
+  Filter by question text (partial, case-insensitive).
+</ParamField>
+
+### POST /api/admin/questions
+
+Creates a new survey question.
+
+#### Request body
+
+<ParamField body="question" type="string" required>
+  Question text. Must be unique across all questions (max 255 characters).
+</ParamField>
+
+#### Example response
+
+```json
+{
+  "success": true,
+  "message": "Question created successfully",
+  "question": {
+    "id": 5,
+    "question": "Who will you vote for?",
+    "position": 5
+  }
+}
+```
+
+### POST /api/admin/questions/update/positions
+
+Updates display order for multiple questions in a single request.
+
+#### Request body
+
+<ParamField body="items" type="array" required>
+  Array of `{ id, position }` objects.
+</ParamField>
+
+```json
+{
+  "items": [
+    { "id": 1, "position": 2 },
+    { "id": 2, "position": 1 }
+  ]
+}
+```
+
+<Warning>Returns `422` if any question ID does not exist.</Warning>
+
+---
+
+## Answers
+
+Each answer belongs to exactly one question. Answers are displayed to field users in the survey form in position order.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/answers` | List all answers |
+| `GET` | `/api/admin/answers/create` | Get all questions (for answer create form) |
+| `POST` | `/api/admin/answers` | Create an answer |
+| `GET` | `/api/admin/answers/{answer}` | Get a single answer (with question) |
+| `PUT` | `/api/admin/answers/{answer}` | Update an answer |
+| `DELETE` | `/api/admin/answers/{answer}` | Delete an answer |
+| `POST` | `/api/admin/answers/update/positions` | Reorder answers |
+
+### GET /api/admin/answers
+
+Returns a paginated list of answers. Supports filtering by answer text, question text, or question ID.
+
+#### Query parameters
+
+<ParamField query="per_page" type="number" default="20">
+  Number of answers per page.
+</ParamField>
+
+<ParamField query="answer" type="string">
+  Filter by answer text (partial, case-insensitive).
+</ParamField>
+
+<ParamField query="question" type="string">
+  Filter by the associated question text (partial, case-insensitive).
+</ParamField>
+
+<ParamField query="question_id" type="number">
+  Filter answers belonging to a specific question ID.
+</ParamField>
+
+### GET /api/admin/answers/create
+
+Returns the full list of questions in position order. Use this to populate the question dropdown when building the answer creation form.
+
+### POST /api/admin/answers
+
+Creates a new answer option for an existing question.
+
+#### Request body
+
+<ParamField body="answer" type="string" required>
+  Answer text (max 255 characters).
+</ParamField>
+
+<ParamField body="question_id" type="number" required>
+  ID of the question this answer belongs to. Must exist in the `questions` table.
+</ParamField>
+
+---
+
+## Combined view
+
+### GET /api/admin/questions-answers
+
+Returns all questions and their answers in a single response. Used to populate the survey form for admin review.
+
+---
+
+## Role permissions
+
+### GET /api/admin/role-permissions
+
+Returns the current role-permission assignments. Used to determine which pages and features are accessible to each role.
+
+---
+
+## Settings
+
+Settings are key-value configuration entries organized by type. They control per-feature options across the system.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/settings` | List all settings |
+| `GET` | `/api/admin/settings/{type}` | List settings by type slug |
+| `GET` | `/api/admin/settings/single/{id}` | Get a single setting by ID |
+| `POST` | `/api/admin/settings` | Create a setting |
+| `PUT` | `/api/admin/settings/{setting}` | Update a setting |
+| `GET` | `/api/admin/settings/delete/{id}` | Delete a setting |
+| `POST` | `/api/admin/settings/update-positions` | Reorder settings |
+
+<Tip>Use `GET /api/admin/settings/{type}` to fetch only the settings relevant to a specific feature area (e.g., `voter-cards`, `dashboard`).</Tip>
+
+---
+
+## Pages
+
+Pages control which sections of the application are visible to each role. Admins manage both the admin-facing pages and the manager-facing pages.
+
+### Admin pages
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/pages` | List all admin pages |
+| `POST` | `/api/admin/pages` | Create a page |
+| `GET` | `/api/admin/pages/{page}` | Get a single page |
+| `PUT` | `/api/admin/pages/{page}` | Update a page |
+| `DELETE` | `/api/admin/pages/{page}` | Delete a page |
+| `POST` | `/api/admin/pages/update-status` | Bulk update page visibility status |
+
+### Manager pages
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/admin/manager-pages` | List all manager pages |
+| `POST` | `/api/admin/manager-pages` | Create a manager page |
+| `GET` | `/api/admin/manager-pages/{page}` | Get a single manager page |
+| `PUT` | `/api/admin/manager-pages/{page}` | Update a manager page |
+| `DELETE` | `/api/admin/manager-pages/{page}` | Delete a manager page |
+| `POST` | `/api/admin/manager-pages/update-status` | Bulk update manager page visibility |

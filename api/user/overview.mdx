@@ -1,0 +1,141 @@
+---
+title: "User API"
+description: "Endpoints available to field surveyors with the User role."
+---
+
+The User role is assigned to front-line field surveyors. Users are scoped to one or more constituencies and are responsible for conducting door-to-door surveys, registering unregistered voters, and recording voter card scans on election day.
+
+<Note>All endpoints under `/api/user/*` require the **User** role and a valid JWT bearer token.</Note>
+
+<Note>Page-level access (which sections of the app are visible) is controlled by the Admin through the pages permission system. Use `GET /api/user/fatch-all-user-permissions` to retrieve the current user's page access flags at login.</Note>
+
+---
+
+## Voter lists
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/user/voters-list` | Paginated list of voters in assigned constituencies |
+| `GET` | `/api/user/voters-list/newly-registered` | Newly registered voters |
+| `GET` | `/api/user/duplicate-voters` | Voters with duplicate name entries |
+| `GET` | `/api/user/voters-in-survey` | Voters who have been surveyed |
+| `GET` | `/api/user/died-voters-in-survey` | Deceased voters included in surveys |
+| `GET` | `/api/user/voters-not-in-survey` | Voters not yet surveyed |
+| `GET` | `/api/user/birthday-voters` | Voters with upcoming birthdays |
+| `GET` | `/api/user/birthday-voters-contacted/{id}` | Birthday voters who have been contacted |
+| `GET` | `/api/user/voters-diff-address` | Voters registered at a different address |
+| `GET` | `/api/user/voters-history/{id}` | Survey history for a specific voter |
+| `GET` | `/api/user/voters/address` | Address-based voter search |
+| `GET` | `/api/user/voters/unregister/address` | Address search for unregistered voters |
+| `GET` | `/api/user/national-registery-list` | National registry voter list |
+| `POST` | `/api/user/update-diff-address` | Update a voter's different address flag |
+| `GET` | `/api/user/register_somewhere_else_living_in_my_constituency` | Voters living in constituency but registered elsewhere |
+| `GET` | `/api/user/get-user-surveys-count` | Total survey count for the current user |
+
+---
+
+## Surveys
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/user/surveys/list` | List surveys submitted by this user |
+| `GET` | `/api/user/surveys/{id}` | Get a single survey |
+| `POST` | `/api/user/surveys` | Submit a new survey |
+| `PUT` | `/api/user/surveys/{id}` | Update a survey |
+| `DELETE` | `/api/user/surveys/{id}` | Delete a survey |
+| `GET` | `/api/user/questions-answers` | Fetch questions and answers for the survey form |
+| `GET` | `/api/user/voter` | Look up a voter by query |
+| `GET` | `/api/user/voter/{voterId}` | Look up a voter by ID |
+| `GET` | `/api/user/voters/suggestions` | Autocomplete voter name suggestions |
+| `GET` | `/api/user/surveyer-search` | Search surveyor records |
+| `GET` | `/api/user/constituencies` | List constituencies assigned to this user |
+| `GET` | `/api/user/all-constituency` | List all constituencies (for dropdowns) |
+| `POST` | `/api/user/update-diff-address` | Update address difference flag on a survey |
+
+---
+
+## Unregistered voters
+
+Unregistered voters are individuals who have been identified in the field but do not appear in the official voter register. The contact-tracking workflow uses notes to record each outreach attempt.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/user/unregistered-voters` | Add a new unregistered voter |
+| `GET` | `/api/user/unregistered-voters` | List unregistered voters in scope |
+| `GET` | `/api/user/unregistered-voters/{id}` | Get a single unregistered voter |
+| `PUT` | `/api/user/unregistered-voters/{id}` | Update an unregistered voter |
+| `DELETE` | `/api/user/unregistered-voters/{id}` | Delete an unregistered voter |
+| `GET` | `/api/user/unregistered-voters-diff-address` | Unregistered voters at different addresses |
+| `POST` | `/api/user/update-diff-address-unregister-voter` | Update address flag for an unregistered voter |
+| `GET` | `/api/user/unregistered-voters/{id}/get-contacted_voters` | Records of contacted attempts |
+| `GET` | `/api/user/unregistered-voters/{id}/get-uncontacted_voters` | Records of uncontacted attempts |
+
+### Notes (contact tracking)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/user/unregistered-voters/notes/list/{unregistered_voter_id}` | List notes for an unregistered voter |
+| `POST` | `/api/user/unregistered-voters/{unregistered_voter_id}/contacted` | Add a contact note |
+| `GET` | `/api/user/unregistered-voters/notes/{id}` | Get a single note |
+| `PUT` | `/api/user/unregistered-voters/notes/{id}` | Update a note |
+| `DELETE` | `/api/user/unregistered-voters/notes/{id}` | Delete a note |
+
+---
+
+## Voter cards
+
+On election day, field users scan or record voter cards to track turnout in real time.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/user/add-voter-card-result` | Record a voter card scan |
+| `GET` | `/api/user/get-voter-card-result/{id}` | Get a voter card result |
+| `POST` | `/api/user/update-voter-card-result/{id}` | Update a voter card result |
+| `DELETE` | `/api/user/delete-voter-card-result/{id}` | Delete a voter card result |
+| `GET` | `/api/user/list-voter-card-result` | List all voter card results for this user |
+| `GET` | `/api/user/get-voter-with-id/{id}` | Look up voter details by ID |
+| `POST` | `/api/user/upload-voter-card` | Upload a voter card image |
+| `GET` | `/api/user/get-voter-card-images` | Retrieve uploaded voter card images |
+
+---
+
+## Dashboard
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/user/stats` | Personal dashboard stats for the current user |
+| `GET` | `/api/user/app-stats` | Aggregate app stats relevant to this user |
+| `GET` | `/api/user/stats-list` | Detailed stats breakdown |
+| `GET` | `/api/user/question-stats` | Survey answer breakdown by question |
+| `GET` | `/api/user/fatch-all-user-permissions` | All page access permission flags for this user |
+| `GET` | `/api/user/party/search` | Live search parties |
+| `GET` | `/api/user/parties` | List all parties |
+
+---
+
+## Call center
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/user/call-center/list` | List voters queued for callback |
+
+---
+
+## Profile
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/user/get-profile` | Get the current user's profile |
+| `POST` | `/api/user/update-profile` | Update the current user's profile |
+
+---
+
+## System settings (read-only)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/user/system-settings` | Retrieve global system settings |
+
+<Note>Users can only read system settings. To update settings, an Admin must use `PUT /api/admin/system-settings`.</Note>
+
+See [System Settings](/api/admin/system-settings) for the full field reference.

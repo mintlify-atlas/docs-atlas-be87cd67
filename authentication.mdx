@@ -1,0 +1,184 @@
+---
+title: "Authentication"
+description: "How to obtain and use JWT bearer tokens with the Fire242 API."
+---
+
+## Overview
+
+Fire242 uses JSON Web Tokens (JWT) for authentication via the [`php-open-source-saver/jwt-auth`](https://github.com/PHP-Open-Source-Saver/jwt-auth) package. Every protected endpoint requires a valid bearer token in the `Authorization` header.
+
+The authentication flow is straightforward:
+
+1. POST credentials to `/api/auth/login`
+2. Receive a JWT `access_token` in the response
+3. Include `Authorization: Bearer <token>` on every subsequent request
+4. POST to `/api/auth/logout` when the session ends
+
+Fire242 enforces **single-device sessions**. Each login generates a new token and invalidates the previous one. If a second login occurs on another device, the first device's token is immediately invalidated.
+
+## Obtaining a token
+
+### POST /api/auth/login
+
+Submit your email and password to receive a bearer token.
+
+#### Request parameters
+
+<ParamField body="email" type="string" required>
+  The user's email address.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  The user's password.
+</ParamField>
+
+#### Example request
+
+```bash
+curl --request POST \
+  --url https://your-domain.com/api/auth/login \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "email": "admin@fire242.com",
+    "password": "secret"
+  }'
+```
+
+#### Response fields
+
+<ResponseField name="access_token" type="string" required>
+  The JWT bearer token. Include this value in the `Authorization` header of every subsequent request.
+</ResponseField>
+
+<ResponseField name="token_type" type="string" required>
+  Always `"bearer"`.
+</ResponseField>
+
+<ResponseField name="user" type="object" required>
+  The authenticated user record.
+
+  <Expandable title="user properties">
+    <ResponseField name="id" type="number">
+      Unique user ID.
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Display name.
+    </ResponseField>
+    <ResponseField name="email" type="string">
+      Email address.
+    </ResponseField>
+    <ResponseField name="role_id" type="number">
+      Numeric role identifier.
+    </ResponseField>
+    <ResponseField name="phone" type="string">
+      Phone number.
+    </ResponseField>
+    <ResponseField name="address" type="string">
+      Address on record.
+    </ResponseField>
+    <ResponseField name="is_active" type="boolean">
+      Whether the account is active.
+    </ResponseField>
+    <ResponseField name="constituency_id" type="string">
+      Comma-separated constituency ID(s) assigned to the user. Present for `user` and `manager` roles.
+    </ResponseField>
+    <ResponseField name="image_url" type="string">
+      Full URL of the user's profile image.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="role" type="string" required>
+  The lowercase role name of the authenticated user: `"admin"`, `"manager"`, or `"user"`. Use this to determine which routes and UI sections the user can access.
+</ResponseField>
+
+<ResponseField name="pages" type="array">
+  The list of permitted page slugs for this user. Populated for `user` and `manager` roles. Admins receive an empty array — they have unrestricted access.
+</ResponseField>
+
+<ResponseField name="settings" type="object">
+  Manager system settings, including constituency configuration. Only present when `role` is `"manager"`.
+</ResponseField>
+
+<ResponseField name="constituencies" type="array">
+  The names of constituencies assigned to the user. Only present when `role` is `"user"` and the user has a `constituency_id` set.
+
+  ```json
+  "constituencies": ["Centreville-Grant's Town", "Farm Road-Enumeration District #7"]
+  ```
+</ResponseField>
+
+#### Example response (user role)
+
+```json
+{
+  "user": {
+    "id": 12,
+    "name": "Jane Smith",
+    "email": "surveyor@example.com",
+    "role_id": 2,
+    "phone": "2421234567",
+    "address": "Nassau, New Providence",
+    "is_active": true,
+    "constituency_id": "3",
+    "manager_id": 4,
+    "image_url": "https://your-domain.com/storage/users/avatar.avif"
+  },
+  "role": "user",
+  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwczovL...",
+  "token_type": "bearer",
+  "pages": [
+    { "id": 1, "name": "Voters List", "slug": "voters-list" },
+    { "id": 2, "name": "Surveys", "slug": "surveys" }
+  ],
+  "settings": [],
+  "constituencies": ["Centreville-Grant's Town"]
+}
+```
+
+## Using the token
+
+Include the token as a bearer credential in the `Authorization` header of every request to a protected endpoint.
+
+```bash
+curl --request GET \
+  --url https://your-domain.com/api/user/voters-list \
+  --header 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...'
+```
+
+The `jwt.auth` middleware validates the token on every request. If validation fails, the API returns a `401` response.
+
+## Logging out
+
+### POST /api/auth/logout
+
+Invalidate the current token and end the session. The request must include the bearer token.
+
+```bash
+curl --request POST \
+  --url https://your-domain.com/api/auth/logout \
+  --header 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...'
+```
+
+```json
+{
+  "message": "Successfully logged out"
+}
+```
+
+After logout, any further requests using the invalidated token will receive a `401` response. To start a new session, the user must log in again.
+
+## Error responses
+
+| Status | Condition | Response body |
+|---|---|---|
+| `401` | Invalid email or password | `{ "success": false, "message": "Invalid email or password" }` |
+| `401` | Token missing | `{ "success": false, "message": "Token not provided" }` |
+| `401` | Token expired | `{ "success": false, "message": "Token expired" }` |
+| `401` | Token invalid | `{ "message": "Token invalid" }` |
+| `401` | Session superseded by another device | `{ "success": false, "message": "You have been logged out due to login on another device" }` |
+| `403` | Account deactivated | `{ "success": false, "message": "Your account has been blocked by admin" }` |
+
+<Warning>
+  If an admin has blocked your account, the login endpoint returns `403` with the message `"Your account has been blocked by admin"`. You cannot obtain a new token until an admin reactivates the account.
+</Warning>
